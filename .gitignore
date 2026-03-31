@@ -1,0 +1,36 @@
+# Python кэш
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Виртуальные среды
+venv/
+.env/
+
+# Jupyter ноутбуки
+.ipynb_checkpoints/
+
+# ML модели и данные
+models/
+data/
+*.h5
+*.pkl
+*.joblib
+
+# Логи и временные файлы
+*.log
+*.tmp
+*.bak
+
+# Конфигурации с секретами
+config/secrets.yaml
+config/*.key
+
+# Системные файлы
+.DS_Store
+Thumbs.db
+
+# Batch / временные файлы
+batch/__pycache__/
+batch/tasks/__pycache__/
