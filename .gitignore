@@ -1,19 +1,32 @@
-# Python кэш
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# Системные файлы
+.DS_Store
+Thumbs.db
 
-# Виртуальные среды
+# IDE / редакторы
+.idea/
+*.iml
+.vscode/
+
+# Виртуальные окружения
+.venv/
 venv/
-.env/
+.env
+.env.*
 
-# Jupyter ноутбуки
-.ipynb_checkpoints/
+# Python cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-# ML модели и данные
-models/
+# ML данные и модели
 data/
+data/raw/
+data/processed/
+data/output/
+models/
+artifacts/
 *.h5
 *.pkl
 *.joblib
@@ -22,15 +35,9 @@ data/
 *.log
 *.tmp
 *.bak
-
-# Конфигурации с секретами
-config/secrets.yaml
-config/*.key
-
-# Системные файлы
-.DS_Store
-Thumbs.db
-
-# Batch / временные файлы
 batch/__pycache__/
 batch/tasks/__pycache__/
+
+# Конфиги с секретами
+config/secrets.yaml
+config/*.key
