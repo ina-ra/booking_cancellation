@@ -119,6 +119,11 @@ new_columns = df.columns.tolist()
 added_features = list(set(new_columns) - set(original_columns))
 print(added_features)
 
+removed_features = list(set(original_columns) - set(new_columns))
+
+print("\nУдалённые признаки:")
+print(removed_features)
+
 print("\nПервые 5 строк:")
 print(df.head())
 
