@@ -124,7 +124,7 @@ removed_features = list(set(original_columns) - set(new_columns))
 print("\nУдалённые признаки:")
 print(removed_features)
 
-print("\nПервые 5 строк:")
-print(df.head())
+# print("\nПервые 5 строк:")
+# print(df.head())
 
 # запуск из терминала: python src/preprocessing.py
