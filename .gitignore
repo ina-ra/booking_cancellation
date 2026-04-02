@@ -21,15 +21,15 @@ __pycache__/
 .ruff_cache/
 
 # ML данные и модели
-data/
-data/raw/
-data/processed/
-data/output/
-models/
-artifacts/
-*.h5
-*.pkl
-*.joblib
+# data/
+# data/raw/
+# data/processed/
+# data/output/
+# models/
+# artifacts/
+# *.h5
+# *.pkl
+# *.joblib
 
 # Логи и временные файлы
 *.log
