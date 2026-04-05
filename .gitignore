@@ -37,6 +37,12 @@ __pycache__/
 *.bak
 batch/__pycache__/
 batch/tasks/__pycache__/
+catboost_info/
+
+# Сохраненные модели
+model/catboost_model.cbm
+model/xgboost_model.json
+model/logistic_regression_model.pkl
 
 # Конфиги с секретами
 config/secrets.yaml
