@@ -12,9 +12,9 @@ TEST_SIZE = 0.2
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(BASE_DIR, "data", "processed", "booking_clean.csv")
-MODEL_DIR = os.path.join(BASE_DIR, "model")
-MODEL_PATH = os.path.join(MODEL_DIR, "lightgbm_model.txt")
-REPORT_PATH = os.path.join(MODEL_DIR, "model_comparison.json")
+ARTIFACTS_DIR = os.path.join(BASE_DIR, "artifacts")
+MODEL_PATH = os.path.join(ARTIFACTS_DIR, "lightgbm_model.txt")
+REPORT_PATH = os.path.join(ARTIFACTS_DIR, "model_comparison.json")
 
 TARGET_COLUMN = "booking status"
 ID_COLUMN = "Booking_ID"
@@ -119,7 +119,7 @@ def main():
         },
     }
 
-    os.makedirs(MODEL_DIR, exist_ok=True)
+    os.makedirs(ARTIFACTS_DIR, exist_ok=True)
     lightgbm_model.booster_.save_model(MODEL_PATH)
     with open(REPORT_PATH, "w", encoding="utf-8") as file:
         json.dump(report, file, ensure_ascii=False, indent=2)

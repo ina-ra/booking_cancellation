@@ -40,9 +40,9 @@ batch/tasks/__pycache__/
 catboost_info/
 
 # Сохраненные модели
-model/catboost_model.cbm
-model/xgboost_model.json
-model/logistic_regression_model.pkl
+artifacts/catboost_model.cbm
+artifacts/xgboost_model.json
+artifacts/logistic_regression_model.pkl
 
 # Конфиги с секретами
 config/secrets.yaml
