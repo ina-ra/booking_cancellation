@@ -1,5 +1,6 @@
 import json
 import os
+import pickle
 
 import pandas as pd
 from lightgbm import LGBMClassifier
@@ -16,6 +17,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(BASE_DIR, "data", "raw", "booking.csv")
 ARTIFACTS_DIR = os.path.join(BASE_DIR, "artifacts")
 MODEL_PATH = os.path.join(ARTIFACTS_DIR, "lightgbm_model.txt")
+MODEL_PICKLE_PATH = os.path.join(ARTIFACTS_DIR, "lightgbm_model.pkl")
 REPORT_PATH = os.path.join(ARTIFACTS_DIR, "model_comparison.json")
 
 TARGET_COLUMN = "booking status"
@@ -125,6 +127,8 @@ def main():
 
     os.makedirs(ARTIFACTS_DIR, exist_ok=True)
     lightgbm_model.booster_.save_model(MODEL_PATH)
+    with open(MODEL_PICKLE_PATH, "wb") as file:
+        pickle.dump(lightgbm_model, file)
     with open(REPORT_PATH, "w", encoding="utf-8") as file:
         json.dump(report, file, ensure_ascii=False, indent=2)
 
