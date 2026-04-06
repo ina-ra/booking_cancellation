@@ -5,6 +5,33 @@
     "train_rows": 20779,
     "test_rows": 5195
   },
+  "preprocessing": {
+    "original_shape": [
+      36285,
+      17
+    ],
+    "processed_shape": [
+      25974,
+      26
+    ],
+    "duplicates_count": 10276,
+    "invalid_dates_count": 35,
+    "added_features": [
+      "is_family",
+      "total_guests",
+      "previous_cancel_ratio",
+      "has_special_requests",
+      "previous_bookings",
+      "price_per_night",
+      "reservation_month",
+      "reservation_dayofweek",
+      "weekend_share",
+      "total_nights"
+    ],
+    "removed_features": [
+      "date of reservation"
+    ]
+  },
   "categorical_columns": [
     "type of meal",
     "room type",

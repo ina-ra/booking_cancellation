@@ -6,12 +6,14 @@ from lightgbm import LGBMClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 
+from preprocessing import preprocess_booking_data
+
 
 RANDOM_STATE = 42
 TEST_SIZE = 0.2
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH = os.path.join(BASE_DIR, "data", "processed", "booking_clean.csv")
+DATA_PATH = os.path.join(BASE_DIR, "data", "raw", "booking.csv")
 ARTIFACTS_DIR = os.path.join(BASE_DIR, "artifacts")
 MODEL_PATH = os.path.join(ARTIFACTS_DIR, "lightgbm_model.txt")
 REPORT_PATH = os.path.join(ARTIFACTS_DIR, "model_comparison.json")
@@ -37,7 +39,8 @@ def evaluate_model(model, x_test, y_test):
 
 
 def main():
-    df = pd.read_csv(DATA_PATH)
+    raw_df = pd.read_csv(DATA_PATH)
+    df, preprocessing_summary = preprocess_booking_data(raw_df, is_training=True)
 
     if TARGET_COLUMN not in df.columns:
         raise ValueError(f"Column '{TARGET_COLUMN}' not found in dataset.")
@@ -106,6 +109,7 @@ def main():
             "train_rows": int(len(x_train)),
             "test_rows": int(len(x_test)),
         },
+        "preprocessing": preprocessing_summary,
         "categorical_columns": categorical_columns,
         "parameters": {
             "LightGBM": parameters,

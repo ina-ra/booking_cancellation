@@ -1,145 +1,120 @@
 import os
+
 import pandas as pd
 
-# -----------------------------
-# 1. Пути к файлам
-# -----------------------------
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-input_path = os.path.join(BASE_DIR, "data", "raw", "booking.csv")
-output_path = os.path.join(BASE_DIR, "data", "processed", "booking_clean.csv")
+INPUT_PATH = os.path.join(BASE_DIR, "data", "raw", "booking.csv")
+OUTPUT_PATH = os.path.join(BASE_DIR, "data", "processed", "booking_clean.csv")
 
-# -----------------------------
-# 2. Загрузка данных
-# -----------------------------
-df = pd.read_csv(input_path)
-print("Размер датасета до обработки:", df.shape)
-# сохраняем исходные признаки
-original_columns = df.columns.tolist()
+TARGET_COLUMN = "booking status"
+ID_COLUMN = "Booking_ID"
+DATE_COLUMN = "date of reservation"
 
-# -----------------------------
-# 3. Сохранение Booking_ID
-# -----------------------------
-# Сохраняем ID отдельно, чтобы не потерять связь
-# между предсказанием и конкретным бронированием
-booking_ids = None
-if "Booking_ID" in df.columns:
-    booking_ids = df["Booking_ID"].copy()
-    df = df.drop(columns=["Booking_ID"])
 
-# -----------------------------
-# 4. Обработка пропусков
-# -----------------------------
-# print("Пропуски до обработки:\n", df.isnull().sum())
+def preprocess_booking_data(df, is_training=True):
+    processed_df = df.copy()
+    original_columns = processed_df.columns.tolist()
 
-# Числовые признаки заполняем медианой
-num_cols = df.select_dtypes(include=["int64", "float64"]).columns
-for col in num_cols:
-    df[col] = df[col].fillna(df[col].median())
+    booking_ids = None
+    if ID_COLUMN in processed_df.columns:
+        booking_ids = processed_df[ID_COLUMN].copy()
+        processed_df = processed_df.drop(columns=[ID_COLUMN])
 
-# Категориальные признаки заполняем модой
-cat_cols = df.select_dtypes(include=["object", "string"]).columns
-for col in cat_cols:
-    df[col] = df[col].fillna(df[col].mode()[0])
+    num_cols = processed_df.select_dtypes(include=["int64", "float64"]).columns
+    for col in num_cols:
+        processed_df[col] = processed_df[col].fillna(processed_df[col].median())
 
-# print("Пропуски после обработки:\n", df.isnull().sum())
+    cat_cols = processed_df.select_dtypes(include=["object", "string"]).columns
+    for col in cat_cols:
+        processed_df[col] = processed_df[col].fillna(processed_df[col].mode()[0])
 
-# -----------------------------
-# 5. Удаление дубликатов
-# -----------------------------
-print("Дубликаты:", df.duplicated().sum())
-df = df.drop_duplicates()
-# print("Дубликаты после:", df.duplicated().sum())
+    duplicates_count = int(processed_df.duplicated().sum())
+    if is_training:
+        processed_df = processed_df.drop_duplicates()
 
-# -----------------------------
-# 6. Преобразование target
-# -----------------------------
-# Таргет — это переменная, которую модель будет предсказывать
-df["booking status"] = df["booking status"].map({
-    "Canceled": 1,
-    "Not_Canceled": 0
-})
+    if TARGET_COLUMN in processed_df.columns:
+        processed_df[TARGET_COLUMN] = processed_df[TARGET_COLUMN].map(
+            {
+                "Canceled": 1,
+                "Not_Canceled": 0,
+            }
+        )
 
-# -----------------------------
-# 7. Работа с датой
-# -----------------------------
-df["date of reservation"] = pd.to_datetime(
-    df["date of reservation"],
-    format="mixed",
-    errors="coerce"
-)
+    processed_df[DATE_COLUMN] = pd.to_datetime(
+        processed_df[DATE_COLUMN],
+        format="mixed",
+        errors="coerce",
+    )
 
-# print("\nНекорректные даты:", df["date of reservation"].isna().sum())
+    invalid_dates_count = int(processed_df[DATE_COLUMN].isna().sum())
+    processed_df = processed_df.dropna(subset=[DATE_COLUMN])
 
-# Удаляем строки с некорректной датой
-df = df.dropna(subset=["date of reservation"])
+    processed_df["reservation_month"] = processed_df[DATE_COLUMN].dt.month
+    processed_df["reservation_dayofweek"] = processed_df[DATE_COLUMN].dt.dayofweek
+    processed_df = processed_df.drop(columns=[DATE_COLUMN])
 
-# Создаём признаки из даты
-df["reservation_month"] = df["date of reservation"].dt.month
-df["reservation_dayofweek"] = df["date of reservation"].dt.dayofweek
+    processed_df["total_nights"] = (
+        processed_df["number of weekend nights"] + processed_df["number of week nights"]
+    )
+    processed_df["price_per_night"] = processed_df["average price"] / (
+        processed_df["total_nights"] + 1
+    )
+    processed_df["is_family"] = (processed_df["number of children"] > 0).astype(int)
+    processed_df["total_guests"] = (
+        processed_df["number of adults"] + processed_df["number of children"]
+    )
+    processed_df["weekend_share"] = processed_df["number of weekend nights"] / (
+        processed_df["total_nights"] + 1
+    )
+    processed_df["previous_bookings"] = processed_df["P-C"] + processed_df["P-not-C"]
+    processed_df["previous_cancel_ratio"] = processed_df["P-C"] / (
+        processed_df["previous_bookings"] + 1
+    )
+    processed_df["has_special_requests"] = (processed_df["special requests"] > 0).astype(int)
 
-# Исходную колонку с датой удаляем
-df = df.drop(columns=["date of reservation"])
+    if booking_ids is not None:
+        processed_df[ID_COLUMN] = booking_ids.loc[processed_df.index]
 
-# -----------------------------
-# 8. Feature Engineering
-# -----------------------------
-# Общее количество ночей
-df["total_nights"] = df["number of weekend nights"] + df["number of week nights"]
+    added_features = list(set(processed_df.columns.tolist()) - set(original_columns))
+    removed_features = list(set(original_columns) - set(processed_df.columns.tolist()))
 
-# Цена за ночь
-df["price_per_night"] = df["average price"] / (df["total_nights"] + 1)
+    summary = {
+        "original_shape": df.shape,
+        "processed_shape": processed_df.shape,
+        "duplicates_count": duplicates_count,
+        "invalid_dates_count": invalid_dates_count,
+        "added_features": added_features,
+        "removed_features": removed_features,
+    }
 
-# Есть ли дети
-df["is_family"] = (df["number of children"] > 0).astype(int)
+    return processed_df, summary
 
-# Общее количество гостей
-df["total_guests"] = df["number of adults"] + df["number of children"]
 
-# Доля ночей на выходных
-df["weekend_share"] = df["number of weekend nights"] / (df["total_nights"] + 1)
+def main():
+    df = pd.read_csv(INPUT_PATH)
+    processed_df, summary = preprocess_booking_data(df, is_training=True)
 
-# Сколько бронирований уже было у клиента
-df["previous_bookings"] = df["P-C"] + df["P-not-C"]
+    os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+    processed_df.to_csv(OUTPUT_PATH, index=False)
 
-# Доля прошлых отмен клиента
-df["previous_cancel_ratio"] = df["P-C"] / (df["previous_bookings"] + 1)
+    print("Размер датасета до обработки:", summary["original_shape"])
+    print("Дубликаты:", summary["duplicates_count"])
+    print("Некорректные даты:", summary["invalid_dates_count"])
+    print("Размер датасета:", summary["processed_shape"])
 
-# Есть ли у гостя специальные запросы
-df["has_special_requests"] = (df["special requests"] > 0).astype(int)
+    print("\nСписок признаков:")
+    print(processed_df.columns.tolist())
 
-# -----------------------------
-# 9. Возвращаем Booking_ID
-# -----------------------------
-# Возвращаем только те ID, которые соответствуют строкам,
-# оставшимся после удаления дубликатов и некорректных дат
-if booking_ids is not None:
-    df["Booking_ID"] = booking_ids.loc[df.index]
+    print("\nДобавленные признаки:")
+    print(summary["added_features"])
 
-# -----------------------------
-# 10. Сохранение обработанного датасета
-# -----------------------------
-os.makedirs(os.path.dirname(output_path), exist_ok=True)
-df.to_csv(output_path, index=False)
+    print("\nУдалённые признаки:")
+    print(summary["removed_features"])
 
-# -----------------------------
-# 11. Итог
-# -----------------------------
-print("Размер датасета:", df.shape)
+    print("\nПервые 5 строк:")
+    print(processed_df.head())
 
-print("\nСписок признаков:")
-print(df.columns.tolist())
 
-print("\nДобавленные признаки:")
-new_columns = df.columns.tolist()
-added_features = list(set(new_columns) - set(original_columns))
-print(added_features)
-
-removed_features = list(set(original_columns) - set(new_columns))
-
-print("\nУдалённые признаки:")
-print(removed_features)
-
-print("\nПервые 5 строк:")
-print(df.head())
-
-# запуск из терминала: python src/preprocessing.py
+if __name__ == "__main__":
+    main()
