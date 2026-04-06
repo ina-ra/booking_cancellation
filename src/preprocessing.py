@@ -92,6 +92,21 @@ df["price_per_night"] = df["average price"] / (df["total_nights"] + 1)
 # Есть ли дети
 df["is_family"] = (df["number of children"] > 0).astype(int)
 
+# Общее количество гостей
+df["total_guests"] = df["number of adults"] + df["number of children"]
+
+# Доля ночей на выходных
+df["weekend_share"] = df["number of weekend nights"] / (df["total_nights"] + 1)
+
+# Сколько бронирований уже было у клиента
+df["previous_bookings"] = df["P-C"] + df["P-not-C"]
+
+# Доля прошлых отмен клиента
+df["previous_cancel_ratio"] = df["P-C"] / (df["previous_bookings"] + 1)
+
+# Есть ли у гостя специальные запросы
+df["has_special_requests"] = (df["special requests"] > 0).astype(int)
+
 # -----------------------------
 # 9. Возвращаем Booking_ID
 # -----------------------------
