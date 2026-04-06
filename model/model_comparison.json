@@ -1,0 +1,41 @@
+{
+  "split": {
+    "test_size": 0.2,
+    "random_state": 42,
+    "train_rows": 20779,
+    "test_rows": 5195
+  },
+  "categorical_columns": [
+    "type of meal",
+    "room type",
+    "market segment type"
+  ],
+  "parameters": {
+    "LightGBM": {
+      "n_estimators": 700,
+      "learning_rate": 0.03,
+      "num_leaves": 63,
+      "max_depth": 8,
+      "min_child_samples": 30,
+      "subsample": 0.85,
+      "colsample_bytree": 0.85,
+      "reg_alpha": 0.1,
+      "reg_lambda": 1.5,
+      "min_split_gain": 0.0,
+      "objective": "binary"
+    }
+  },
+  "metrics": {
+    "LightGBM": {
+      "accuracy": 0.8601,
+      "precision": 0.7889,
+      "recall": 0.6983,
+      "f1": 0.7408,
+      "roc_auc": 0.9212
+    }
+  },
+  "best_model": {
+    "name": "LightGBM",
+    "reason": "only active model in the current training script"
+  }
+}
