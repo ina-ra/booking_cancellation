@@ -40,8 +40,8 @@ batch/tasks/__pycache__/
 catboost_info/
 
 # Служебные артефакты инференса
-artifacts/booking_risk_scores.csv
-artifacts/high_risk_bookings.csv
+# artifacts/booking_risk_scores.csv
+# artifacts/high_risk_bookings.csv
 
 # Конфиги с секретами
 config/secrets.yaml
