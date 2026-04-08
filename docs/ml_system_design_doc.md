@@ -194,10 +194,9 @@ flowchart TB
 **Примеры производных признаков**
 
 - `total_nights` — длительность проживания  
-- `lead_time` — время между бронированием и заездом  
-- `price_per_night` — цена за ночь  
-- `is_high_season` — признак сезона  
-- `has_previous_cancellations` — история отмен клиента  
+- `total_guests` — общее количество гостей
+- `price_per_night` — цена за ночь   
+- `previous_cancel_ratio` — доля отмен клиента  
 
 **Результат этапа**
 
