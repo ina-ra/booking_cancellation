@@ -47,14 +47,22 @@ def build_scoring_table(
             "probability_of_cancellation": probabilities.round(4),
         }
     )
-    scores = scores.sort_values("probability_of_cancellation", ascending=False).reset_index(drop=True)
+    scores = scores.sort_values(
+        "probability_of_cancellation",
+        ascending=False,
+    ).reset_index(drop=True)
     scores["rank"] = scores.index + 1
     scores["risk_percentile"] = ((scores["rank"] / len(scores)) * 100).round(2)
 
     top_count = high_risk_count(len(scores), risk_share)
     scores["is_high_risk"] = 0
     scores.loc[: top_count - 1, "is_high_risk"] = 1
-    scores["risk_segment"] = scores["is_high_risk"].map({1: batch_segment_name(True), 0: batch_segment_name(False)})
+    scores["risk_segment"] = scores["is_high_risk"].map(
+        {
+            1: batch_segment_name(True),
+            0: batch_segment_name(False),
+        }
+    )
     return scores
 
 
@@ -76,7 +84,12 @@ def build_single_prediction(payload: dict, model, categorical_columns: list[str]
     return score.to_dict()
 
 
-def build_batch_predictions(payloads: list[dict], model, categorical_columns: list[str], risk_share: float):
+def build_batch_predictions(
+    payloads: list[dict],
+    model,
+    categorical_columns: list[str],
+    risk_share: float,
+):
     booking_ids, features, _ = prepare_features(pd.DataFrame(payloads), categorical_columns)
     probabilities = pd.Series(model.predict_proba(features)[:, 1])
     scores = build_scoring_table(booking_ids, probabilities, risk_share)

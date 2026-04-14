@@ -68,7 +68,12 @@ def test_build_batch_predictions_returns_records(monkeypatch, sample_batch_paylo
     monkeypatch.setattr("src.application.scoring.prepare_features", fake_prepare_features)
 
     model = FakeModel([0.2, 0.9])
-    result = build_batch_predictions(sample_batch_payload, model, categorical_columns=[], risk_share=0.5)
+    result = build_batch_predictions(
+        sample_batch_payload,
+        model,
+        categorical_columns=[],
+        risk_share=0.5,
+    )
 
     assert isinstance(result, list)
     assert len(result) == 2

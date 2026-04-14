@@ -42,9 +42,13 @@ def preprocess_booking_data(df: pd.DataFrame, is_training: bool = True):
     processed_df["total_nights"] = (
         processed_df["number of weekend nights"] + processed_df["number of week nights"]
     )
-    processed_df["price_per_night"] = processed_df["average price"] / (processed_df["total_nights"] + 1)
+    processed_df["price_per_night"] = (
+        processed_df["average price"] / (processed_df["total_nights"] + 1)
+    )
     processed_df["is_family"] = (processed_df["number of children"] > 0).astype(int)
-    processed_df["total_guests"] = processed_df["number of adults"] + processed_df["number of children"]
+    processed_df["total_guests"] = (
+        processed_df["number of adults"] + processed_df["number of children"]
+    )
     processed_df["weekend_share"] = processed_df["number of weekend nights"] / (
         processed_df["total_nights"] + 1
     )

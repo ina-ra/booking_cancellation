@@ -129,7 +129,10 @@ def test_train_lightgbm_pipeline(monkeypatch, tmp_path):
 
     monkeypatch.setattr("src.application.training.settings", FakeSettings)
     monkeypatch.setattr("src.application.training.pd.read_csv", fake_read_csv)
-    monkeypatch.setattr("src.application.training.preprocess_booking_data", fake_preprocess_booking_data)
+    monkeypatch.setattr(
+        "src.application.training.preprocess_booking_data",
+        fake_preprocess_booking_data,
+    )
     monkeypatch.setattr("src.application.training.train_test_split", fake_train_test_split)
     monkeypatch.setattr("src.application.training.evaluate_model", fake_evaluate_model)
     monkeypatch.setattr("src.application.training.LGBMClassifier", FakeLGBMClassifier)
