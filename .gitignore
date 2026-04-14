@@ -21,15 +21,15 @@ __pycache__/
 .ruff_cache/
 
 # ML данные и модели
-data/
-data/raw/
-data/processed/
-data/output/
-models/
-artifacts/
-*.h5
-*.pkl
-*.joblib
+# data/
+# data/raw/
+# data/processed/
+# data/output/
+# models/
+# artifacts/
+# *.h5
+# *.pkl
+# *.joblib
 
 # Логи и временные файлы
 *.log
@@ -37,6 +37,11 @@ artifacts/
 *.bak
 batch/__pycache__/
 batch/tasks/__pycache__/
+catboost_info/
+
+# Служебные артефакты инференса
+# artifacts/booking_risk_scores.csv
+# artifacts/high_risk_bookings.csv
 
 # Конфиги с секретами
 config/secrets.yaml
