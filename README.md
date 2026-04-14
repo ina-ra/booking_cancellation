@@ -46,6 +46,7 @@ booking_cancellation/
 ├── requirements.txt
 ├── requirements-dev.txt
 └── README.md
+```
 
 ## Локальный запуск
 
