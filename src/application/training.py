@@ -1,5 +1,4 @@
 import json
-import os
 import pickle
 
 import pandas as pd
@@ -7,30 +6,13 @@ from lightgbm import LGBMClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 
-from preprocessing import preprocess_booking_data
-
-
-RANDOM_STATE = 42
-TEST_SIZE = 0.2
-
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH = os.path.join(BASE_DIR, "data", "raw", "booking.csv")
-ARTIFACTS_DIR = os.path.join(BASE_DIR, "artifacts")
-MODEL_PATH = os.path.join(ARTIFACTS_DIR, "lightgbm_model.txt")
-MODEL_PICKLE_PATH = os.path.join(ARTIFACTS_DIR, "lightgbm_model.pkl")
-REPORT_PATH = os.path.join(ARTIFACTS_DIR, "model_comparison.json")
-
-TARGET_COLUMN = "booking status"
-ID_COLUMN = "Booking_ID"
-
-# CatBoost, XGBoost и Logistic Regression в этой итерации отключены.
-# Оставляем только обучение и сохранение LightGBM.
+from src.config import settings
+from src.infrastructure.data.preprocessing import preprocess_booking_data
 
 
 def evaluate_model(model, x_test, y_test):
     y_pred = pd.Series(model.predict(x_test)).astype(int)
     y_proba = model.predict_proba(x_test)[:, 1]
-
     return {
         "accuracy": round(accuracy_score(y_test, y_pred), 4),
         "precision": round(precision_score(y_test, y_pred), 4),
@@ -40,27 +22,23 @@ def evaluate_model(model, x_test, y_test):
     }
 
 
-def main():
-    raw_df = pd.read_csv(DATA_PATH)
+def train_lightgbm_pipeline():
+    raw_df = pd.read_csv(settings.raw_booking_data_path)
     df, preprocessing_summary = preprocess_booking_data(raw_df, is_training=True)
 
-    if TARGET_COLUMN not in df.columns:
-        raise ValueError(f"Column '{TARGET_COLUMN}' not found in dataset.")
-
-    drop_columns = [TARGET_COLUMN]
-    if ID_COLUMN in df.columns:
-        drop_columns.append(ID_COLUMN)
+    drop_columns = [settings.target_column]
+    if settings.id_column in df.columns:
+        drop_columns.append(settings.id_column)
 
     x = df.drop(columns=drop_columns)
-    y = df[TARGET_COLUMN]
-
+    y = df[settings.target_column]
     categorical_columns = x.select_dtypes(include=["object", "string"]).columns.tolist()
 
     x_train, x_test, y_train, y_test = train_test_split(
         x,
         y,
-        test_size=TEST_SIZE,
-        random_state=RANDOM_STATE,
+        test_size=settings.test_size,
+        random_state=settings.random_state,
         stratify=y,
     )
 
@@ -68,7 +46,7 @@ def main():
         x_train[column] = x_train[column].astype("category")
         x_test[column] = pd.Categorical(x_test[column], categories=x_train[column].cat.categories)
 
-    lightgbm_model = LGBMClassifier(
+    model = LGBMClassifier(
         n_estimators=700,
         learning_rate=0.03,
         num_leaves=63,
@@ -79,18 +57,14 @@ def main():
         reg_alpha=0.1,
         reg_lambda=1.5,
         min_split_gain=0.0,
-        random_state=RANDOM_STATE,
+        random_state=settings.random_state,
         objective="binary",
         n_jobs=1,
         verbosity=-1,
     )
-    lightgbm_model.fit(
-        x_train,
-        y_train,
-        categorical_feature=categorical_columns,
-    )
+    model.fit(x_train, y_train, categorical_feature=categorical_columns)
 
-    metrics = evaluate_model(lightgbm_model, x_test, y_test)
+    metrics = evaluate_model(model, x_test, y_test)
     parameters = {
         "n_estimators": 700,
         "learning_rate": 0.03,
@@ -106,8 +80,8 @@ def main():
     }
     report = {
         "split": {
-            "test_size": TEST_SIZE,
-            "random_state": RANDOM_STATE,
+            "test_size": settings.test_size,
+            "random_state": settings.random_state,
             "train_rows": int(len(x_train)),
             "test_rows": int(len(x_test)),
         },
@@ -125,22 +99,11 @@ def main():
         },
     }
 
-    os.makedirs(ARTIFACTS_DIR, exist_ok=True)
-    lightgbm_model.booster_.save_model(MODEL_PATH)
-    with open(MODEL_PICKLE_PATH, "wb") as file:
-        pickle.dump(lightgbm_model, file)
-    with open(REPORT_PATH, "w", encoding="utf-8") as file:
+    settings.artifacts_dir.mkdir(parents=True, exist_ok=True)
+    model.booster_.save_model(settings.lightgbm_model_text_path)
+    with open(settings.lightgbm_model_pickle_path, "wb") as file:
+        pickle.dump(model, file)
+    with open(settings.model_report_path, "w", encoding="utf-8") as file:
         json.dump(report, file, ensure_ascii=False, indent=2)
+    return metrics, parameters, report
 
-    print("\nLightGBM")
-    print("--------")
-    for metric_name, value in metrics.items():
-        print(f"{metric_name}: {value}")
-
-    print("\nПараметры LightGBM:")
-    print(json.dumps(parameters, ensure_ascii=False, indent=2))
-    print("\nОтчёт сохранён в:", REPORT_PATH)
-
-
-if __name__ == "__main__":
-    main()

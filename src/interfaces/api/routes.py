@@ -1,9 +1,13 @@
 from fastapi import APIRouter, HTTPException
 
-from app.core.model_loader import model_registry
-from app.schemas.request import BatchBookingRequest, BookingRequest
-from app.schemas.response import BatchPredictionResponse, HealthResponse, PredictionResponse
-from app.services.prediction_service import predict_batch, predict_one
+from src.application.scoring import predict_batch_use_case, predict_one_use_case
+from src.infrastructure.ml.model_loader import model_registry
+from src.interfaces.api.schemas.request import BatchBookingRequest, BookingRequest
+from src.interfaces.api.schemas.response import (
+    BatchPredictionResponse,
+    HealthResponse,
+    PredictionResponse,
+)
 
 router = APIRouter()
 
@@ -22,7 +26,7 @@ def predict(booking: BookingRequest):
     if not model_registry.is_ready():
         raise HTTPException(status_code=503, detail="Model is not loaded")
 
-    result = predict_one(booking.model_dump(by_alias=True))
+    result = predict_one_use_case(booking.model_dump(by_alias=True), model_registry)
     return PredictionResponse(**result)
 
 
@@ -31,8 +35,9 @@ def predict_batch_route(request: BatchBookingRequest):
     if not model_registry.is_ready():
         raise HTTPException(status_code=503, detail="Model is not loaded")
 
-    predictions = predict_batch(
+    predictions = predict_batch_use_case(
         payloads=[item.model_dump(by_alias=True) for item in request.bookings],
         risk_share=request.risk_share,
+        model_registry=model_registry,
     )
     return BatchPredictionResponse(predictions=predictions)

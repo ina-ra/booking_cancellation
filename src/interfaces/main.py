@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 
-from app.api.routes import router
-from app.core.model_loader import model_registry
+from src.infrastructure.ml.model_loader import model_registry
+from src.interfaces.api.routes import router
 
 app = FastAPI(
     title="Booking Cancellation Prediction API",
@@ -16,3 +16,4 @@ def startup_event():
 
 
 app.include_router(router)
+

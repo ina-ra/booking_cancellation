@@ -5,7 +5,6 @@ from pydantic import BaseModel, Field, field_validator
 
 class BookingRequest(BaseModel):
     booking_id: Optional[str] = Field(default=None, alias="Booking_ID")
-
     number_of_adults: int = Field(alias="number of adults")
     number_of_children: int = Field(alias="number of children")
     number_of_weekend_nights: int = Field(alias="number of weekend nights")
@@ -47,29 +46,7 @@ class BookingRequest(BaseModel):
             raise ValueError("Average price must be non-negative")
         return value
 
-    model_config = {
-        "populate_by_name": True,
-        "json_schema_extra": {
-            "example": {
-                "Booking_ID": "INN00001",
-                "number of adults": 2,
-                "number of children": 1,
-                "number of weekend nights": 1,
-                "number of week nights": 3,
-                "type of meal": "Meal Plan 1",
-                "car parking space": 0,
-                "room type": "Room_Type 1",
-                "lead time": 45,
-                "market segment type": "Online",
-                "repeated": 0,
-                "P-C": 0,
-                "P-not-C": 1,
-                "average price": 120.5,
-                "special requests": 2,
-                "date of reservation": "2026-04-10",
-            }
-        },
-    }
+    model_config = {"populate_by_name": True}
 
 
 class BatchBookingRequest(BaseModel):
@@ -82,3 +59,4 @@ class BatchBookingRequest(BaseModel):
         if not 0 < value <= 1:
             raise ValueError("risk_share must be in the range (0, 1]")
         return value
+

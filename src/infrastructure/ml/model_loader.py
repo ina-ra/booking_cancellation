@@ -1,7 +1,7 @@
 import json
 import pickle
 
-from app.core.config import MODEL_PATH, REPORT_PATH
+from src.config import settings
 
 
 class ModelRegistry:
@@ -11,16 +11,14 @@ class ModelRegistry:
         self.model_name = "unknown"
 
     def load(self):
-        if not MODEL_PATH.exists():
-            raise FileNotFoundError(f"Model file not found: {MODEL_PATH}")
+        if not settings.lightgbm_model_pickle_path.exists():
+            raise FileNotFoundError(f"Model file not found: {settings.lightgbm_model_pickle_path}")
+        if not settings.model_report_path.exists():
+            raise FileNotFoundError(f"Report file not found: {settings.model_report_path}")
 
-        if not REPORT_PATH.exists():
-            raise FileNotFoundError(f"Report file not found: {REPORT_PATH}")
-
-        with open(MODEL_PATH, "rb") as file:
+        with open(settings.lightgbm_model_pickle_path, "rb") as file:
             self.model = pickle.load(file)
-
-        with open(REPORT_PATH, "r", encoding="utf-8") as file:
+        with open(settings.model_report_path, "r", encoding="utf-8") as file:
             report = json.load(file)
 
         self.categorical_columns = report.get("categorical_columns", [])
@@ -32,3 +30,4 @@ class ModelRegistry:
 
 
 model_registry = ModelRegistry()
+

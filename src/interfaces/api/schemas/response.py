@@ -12,9 +12,10 @@ class HealthResponse(BaseModel):
 class PredictionResponse(BaseModel):
     booking_id: Optional[str]
     probability_of_cancellation: float
-    is_high_risk: bool
+    is_high_risk: int
     risk_segment: str
 
 
 class BatchPredictionResponse(BaseModel):
     predictions: List[PredictionResponse]
+
