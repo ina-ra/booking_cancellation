@@ -1,7 +1,7 @@
-import numpy as np
 import json
 import pickle
 
+import numpy as np
 import pandas as pd
 
 from src.application.training import evaluate_model, train_lightgbm_pipeline

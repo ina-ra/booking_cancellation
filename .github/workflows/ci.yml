@@ -27,6 +27,14 @@ jobs:
           pip install -r requirements.txt
           if [ -f requirements-dev.txt ]; then pip install -r requirements-dev.txt; fi
 
+      - name: Run linter
+        run: |
+          ruff check .
+
+      - name: Run mypy
+        run: |
+          mypy src
+
       - name: Run tests
         run: |
           pytest
