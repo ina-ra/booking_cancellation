@@ -17,16 +17,16 @@
     "duplicates_count": 10276,
     "invalid_dates_count": 35,
     "added_features": [
-      "previous_cancel_ratio",
+      "total_guests",
+      "total_nights",
       "reservation_month",
       "is_family",
-      "reservation_dayofweek",
       "previous_bookings",
-      "total_nights",
-      "weekend_share",
       "price_per_night",
+      "previous_cancel_ratio",
       "has_special_requests",
-      "total_guests"
+      "weekend_share",
+      "reservation_dayofweek"
     ],
     "removed_features": [
       "date of reservation"
