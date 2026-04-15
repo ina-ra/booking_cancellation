@@ -1,84 +1,84 @@
-# Booking Cancellation Prediction Service
+﻿# Booking Cancellation Prediction Service
 
-Сервис для предсказания вероятности отмены бронирования в гостиничном бизнесе.
+Сервис предсказывает вероятность отмены бронирования в гостиничном бизнесе.
 
-Проект помогает оценивать риск отмены бронирования на основе признаков заказа и использовать этот прогноз в прикладных сценариях: анализе бронирований, приоритизации high-risk случаев и batch scoring.
+Проект оценивает риск отмены по признакам бронирования и использует прогноз в трёх сценариях:
+
+- online inference для одного бронирования;
+- batch scoring для списка бронирований;
+- мониторинг качества модели и процесса предобработки.
 
 ## Архитектура
 
 Код организован по Clean Architecture:
 
-- `src/domain` - доменные сущности и бизнес-правила определения риска.
-- `src/application` - use cases и прикладная логика scoring/training.
-- `src/infrastructure` - адаптеры предобработки, загрузки модели и работы с файлами.
-- `src/interfaces` - API-слой, CLI entrypoints и точка входа приложения.
-- `app` - FastAPI entrypoint и runtime-конфигурация сервиса.
-- `tests` - unit-тесты для ключевой логики проекта.
+- `src/domain` — доменные сущности и бизнес-правила риска;
+- `src/application` — use cases обучения, скоринга и мониторинга;
+- `src/infrastructure` — адаптеры БД, S3/MinIO и ML-интеграции;
+- `src/interfaces` — API, CLI и точка входа приложения;
+- `tests` — unit-тесты.
 
-## Структура репозитория
+## Что делает сервис
 
-```text
-booking_cancellation/
-├── .github/
-│   └── workflows/
-│       └── ci.yml
-├── app/
-│   ├── main.py
-│   ├── api/
-│   ├── core/
-│   └── schemas/
-├── artifacts/
-│   ├── lightgbm_model.pkl
-│   ├── lightgbm_model.txt
-│   └── model_comparison.json
-├── data/
-│   ├── raw/
-│   └── processed/
-├── src/
-│   ├── application/
-│   ├── domain/
-│   ├── infrastructure/
-│   ├── interfaces/
-│   └── config.py
-├── tests/
-├── .coveragerc
-├── mypy.ini
-├── pytest.ini
-├── requirements.txt
-├── requirements-dev.txt
-└── README.md
-```
+1. Обучает LightGBM-модель на исторических бронированиях.
+2. Сохраняет артефакты модели только в S3-compatible storage.
+3. Загружает модель из S3 при старте API.
+4. Пишет метрики обучения и batch scoring в Postgres.
+
+## Требования
+
+- Python 3.11+
+- Postgres
+- S3-compatible storage
+- Для локальной разработки можно использовать MinIO через `docker-compose.minio.yml`
 
 ## Локальный запуск
 
-Подготовить окружение:
+1. Скопировать `.env.example` в `.env`.
+2. Заполнить `POSTGRES_*` и `S3_*` переменные.
+3. При локальной разработке поднять MinIO:
 
-- скопировать `.env.example` в `.env`;
-- заполнить переменные под локальную среду при необходимости.
+```powershell
+docker compose -f docker-compose.minio.yml up -d
+```
 
-Установить зависимости:
+1. Установить зависимости:
 
-- `py -m pip install -r requirements.txt`
-- `py -m pip install -r requirements-dev.txt`
+```powershell
+py -m pip install -r requirements.txt
+py -m pip install -r requirements-dev.txt
+```
 
-Запустить API:
+1. Обучить модель и загрузить артефакты в S3:
 
-- `py -m uvicorn app.main:app --reload`
+```powershell
+py -m src.interfaces.cli.train_models_cli
+```
 
-Открыть Swagger UI:
+1. Запустить API:
 
-- `http://127.0.0.1:8000/docs`
+```powershell
+py -m uvicorn src.interfaces.main:app --reload
+```
+
+1. Открыть Swagger UI:
+
+```text
+http://127.0.0.1:8000/docs
+```
 
 ## MinIO / Local S3
 
-Проект поддерживает хранение артефактов модели в MinIO через S3-compatible API.
-Если S3-переменные заданы в `.env`, сервис использует MinIO как источник истины для модели и `model_comparison.json`.
+Проект использует S3 как единственный источник истины для артефактов модели.
+Локальный каталог `artifacts/` не хранится в git и не используется как fallback для загрузки модели.
 
-Поднять локальный MinIO:
+Для локального MinIO:
 
-- `docker compose -f docker-compose.minio.yml up -d`
+```powershell
+docker compose -f docker-compose.minio.yml up -d
+```
 
-Заполнить переменные в `.env`:
+Заполнить в `.env`:
 
 - `S3_ENDPOINT_URL=http://localhost:9000`
 - `S3_BUCKET=booking-cancellation-artifacts`
@@ -93,13 +93,48 @@ booking_cancellation/
 
 Как это работает:
 
-- `train_models_cli` сохраняет артефакты локально в `artifacts/`, затем загружает их в MinIO.
-- API на старте и batch scoring CLI загружают модель и метаданные из MinIO, если S3 включен.
-- Если S3 не настроен, проект продолжает работать в локальном файловом режиме.
-- `docker-compose.minio.yml` читает MinIO credentials из локального `.env`, поэтому секреты не хранятся в репозитории.
+- `train_models_cli` обучает модель и публикует `lightgbm_model.txt`, `lightgbm_model.pkl` и `model_comparison.json` напрямую в S3;
+- API на старте загружает модель и метаданные из S3;
+- batch scoring CLI использует модель из S3 и пишет мониторинговые записи в Postgres.
 
 ## API
 
-- `GET /health` - healthcheck и проверка загрузки модели.
-- `POST /predict` - предсказание вероятности отмены для одного бронирования.
-- `POST /predict/batch` - batch scoring для списка бронирований.
+- `GET /health` — healthcheck и статус загрузки модели.
+- `POST /predict` — предсказание вероятности отмены для одного бронирования.
+- `POST /predict/batch` — batch scoring для списка бронирований.
+
+## Мониторинг
+
+Сервис сохраняет в Postgres:
+
+- ML-метрики обучения: `accuracy`, `precision`, `recall`, `f1`, `roc_auc`;
+- технические и процессные метрики: число записей до и после предобработки, долю high-risk, среднюю вероятность отмены, число невалидных дат.
+
+## Тесты
+
+```powershell
+pytest
+```
+
+В проекте настроены:
+
+- unit-тесты;
+- `ruff`;
+- `mypy`;
+- GitHub Actions CI.
+
+## Deploy
+
+Для деплоя нужны:
+
+- отчуждённый Postgres;
+- S3-compatible storage для артефактов модели;
+- заполненные переменные окружения из `.env.example`.
+
+Базовый порядок деплоя:
+
+1. Поднять Postgres и S3 storage.
+2. Задать `POSTGRES_*` и `S3_*` переменные окружения.
+3. Один раз выполнить `py -m src.interfaces.cli.train_models_cli`, чтобы артефакты модели появились в S3.
+4. Запустить API командой `py -m uvicorn src.interfaces.main:app --host 0.0.0.0 --port 8000`.
+5. Проверить `GET /health` и `POST /predict`.

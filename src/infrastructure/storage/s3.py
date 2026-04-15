@@ -58,6 +58,32 @@ class S3ArtifactStorage:
         self.ensure_bucket_exists()
         self.client.upload_file(str(local_path), self.settings.s3_bucket, object_name)
 
+    def upload_bytes(
+        self,
+        payload: bytes,
+        object_name: str,
+        content_type: str = "application/octet-stream",
+    ):
+        self.ensure_bucket_exists()
+        self.client.put_object(
+            Bucket=self.settings.s3_bucket,
+            Key=object_name,
+            Body=payload,
+            ContentType=content_type,
+        )
+
+    def upload_text(
+        self,
+        payload: str,
+        object_name: str,
+        content_type: str = "text/plain; charset=utf-8",
+    ):
+        self.upload_bytes(
+            payload=payload.encode("utf-8"),
+            object_name=object_name,
+            content_type=content_type,
+        )
+
     def download_bytes(self, object_name: str) -> bytes:
         response = self.client.get_object(Bucket=self.settings.s3_bucket, Key=object_name)
         body = cast(Any, response["Body"])

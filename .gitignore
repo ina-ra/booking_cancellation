@@ -35,7 +35,7 @@ tmp*/
 # data/processed/
 # data/output/
 # models/
-# artifacts/
+artifacts/
 # *.h5
 # *.pkl
 # *.joblib

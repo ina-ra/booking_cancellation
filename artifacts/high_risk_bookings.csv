@@ -1,4 +1,0 @@
-booking_id,probability_of_cancellation,rank,risk_percentile,is_high_risk,risk_segment
-INN00121,0.9976,1,10.0,1,top_30_percent
-INN00004,0.9523,2,20.0,1,top_30_percent
-INN00005,0.7406,3,30.0,1,top_30_percent

@@ -1,5 +1,3 @@
-import json
-import pickle
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -103,13 +101,7 @@ def train_lightgbm_pipeline():
         },
     }
 
-    settings.artifacts_dir.mkdir(parents=True, exist_ok=True)
-    model.booster_.save_model(settings.lightgbm_model_text_path)
-    with open(settings.lightgbm_model_pickle_path, "wb") as file:
-        pickle.dump(model, file)
-    with open(settings.model_report_path, "w", encoding="utf-8") as file:
-        json.dump(report, file, ensure_ascii=False, indent=2)
-    upload_training_artifacts()
+    upload_training_artifacts(model, report)
 
     if settings.postgres_enabled:
         model_version = f"lightgbm_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"

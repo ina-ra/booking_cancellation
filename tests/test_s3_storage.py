@@ -30,6 +30,9 @@ class FakeClient:
     def upload_file(self, local_path, bucket, object_name):
         self.calls.append(("upload_file", local_path, bucket, object_name))
 
+    def put_object(self, **kwargs):
+        self.calls.append(("put_object", kwargs))
+
     def get_object(self, Bucket, Key):
         self.calls.append(("get_object", Bucket, Key))
         return {"Body": DummyBody(b"payload")}
@@ -149,4 +152,46 @@ def test_download_bytes_reads_payload():
     assert result == b"payload"
     assert fake_client.calls == [
         ("get_object", "booking-cancellation-artifacts", "artifacts/model.pkl")
+    ]
+
+
+def test_upload_bytes_uses_put_object():
+    fake_client = FakeClient()
+    storage = S3ArtifactStorage(build_settings())
+    storage._client = fake_client
+
+    storage.upload_bytes(b"payload", "artifacts/model.pkl", content_type="application/octet-stream")
+
+    assert fake_client.calls == [
+        ("head_bucket", "booking-cancellation-artifacts"),
+        (
+            "put_object",
+            {
+                "Bucket": "booking-cancellation-artifacts",
+                "Key": "artifacts/model.pkl",
+                "Body": b"payload",
+                "ContentType": "application/octet-stream",
+            },
+        ),
+    ]
+
+
+def test_upload_text_encodes_payload():
+    fake_client = FakeClient()
+    storage = S3ArtifactStorage(build_settings())
+    storage._client = fake_client
+
+    storage.upload_text("payload", "artifacts/report.json", content_type="application/json")
+
+    assert fake_client.calls == [
+        ("head_bucket", "booking-cancellation-artifacts"),
+        (
+            "put_object",
+            {
+                "Bucket": "booking-cancellation-artifacts",
+                "Key": "artifacts/report.json",
+                "Body": b"payload",
+                "ContentType": "application/json",
+            },
+        ),
     ]
