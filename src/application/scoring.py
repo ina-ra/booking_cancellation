@@ -1,6 +1,8 @@
 import pandas as pd
 
 from src.config import settings
+from src.domain.entities.batch_scoring import BatchScoringResult
+from src.domain.entities.booking import Booking
 from src.domain.entities.scoring import BookingRiskScore
 from src.domain.rules.risk_rules import (
     batch_segment_name,
@@ -67,7 +69,11 @@ def build_scoring_table(
 
 
 def build_single_prediction(payload: dict, model, categorical_columns: list[str]) -> dict:
-    booking_ids, features, _ = prepare_features(pd.DataFrame([payload]), categorical_columns)
+    booking = Booking.from_payload(payload)
+    booking_ids, features, _ = prepare_features(
+        pd.DataFrame([booking.to_payload()]),
+        categorical_columns,
+    )
     probability = float(model.predict_proba(features)[:, 1][0])
 
     booking_id = None
@@ -90,10 +96,27 @@ def build_batch_predictions(
     categorical_columns: list[str],
     risk_share: float,
 ):
-    booking_ids, features, _ = prepare_features(pd.DataFrame(payloads), categorical_columns)
+    bookings = [Booking.from_payload(payload) for payload in payloads]
+    booking_ids, features, _ = prepare_features(
+        pd.DataFrame([booking.to_payload() for booking in bookings]),
+        categorical_columns,
+    )
     probabilities = pd.Series(model.predict_proba(features)[:, 1])
     scores = build_scoring_table(booking_ids, probabilities, risk_share)
-    return scores.to_dict(orient="records")
+    result = BatchScoringResult(
+        scores=[
+            BookingRiskScore(
+                booking_id=row["booking_id"],
+                probability_of_cancellation=float(row["probability_of_cancellation"]),
+                rank=int(row["rank"]),
+                risk_percentile=float(row["risk_percentile"]),
+                is_high_risk=int(row["is_high_risk"]),
+                risk_segment=str(row["risk_segment"]),
+            )
+            for row in scores.to_dict(orient="records")
+        ]
+    )
+    return result.to_dict_list()
 
 
 def predict_one_use_case(payload: dict, model_registry) -> dict:

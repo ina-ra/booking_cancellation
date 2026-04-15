@@ -7,6 +7,7 @@ from sklearn.model_selection import train_test_split
 
 from src.application.monitoring import build_training_monitoring_metrics
 from src.config import settings
+from src.domain.entities.training_result import TrainingResult
 from src.infrastructure.data.preprocessing import preprocess_booking_data
 from src.infrastructure.db.repositories import save_model_run, save_monitoring_metrics
 from src.infrastructure.ml.artifacts import upload_training_artifacts
@@ -101,23 +102,30 @@ def train_lightgbm_pipeline():
         },
     }
 
-    upload_training_artifacts(model, report)
+    result = TrainingResult(
+        model_name="LightGBM",
+        metrics=metrics,
+        parameters=parameters,
+        report=report,
+    )
+
+    upload_training_artifacts(model, result.report)
 
     if settings.postgres_enabled:
         model_version = f"lightgbm_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
         save_model_run(
-            model_name="LightGBM",
+            model_name=result.model_name,
             model_version=model_version,
-            metrics=metrics,
-            parameters=parameters,
+            metrics=result.metrics,
+            parameters=result.parameters,
         )
         save_monitoring_metrics(
             run_type="train",
-            model_name="LightGBM",
+            model_name=result.model_name,
             metrics=build_training_monitoring_metrics(
                 preprocessing_summary=preprocessing_summary,
-                evaluation_metrics=metrics,
+                evaluation_metrics=result.metrics,
             ),
         )
-    return metrics, parameters, report
+    return result
 
