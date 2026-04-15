@@ -1,7 +1,4 @@
-import json
-import pickle
-
-from src.config import settings
+from src.infrastructure.ml.artifacts import load_model_report, load_pickled_model
 
 
 class ModelRegistry:
@@ -11,15 +8,8 @@ class ModelRegistry:
         self.model_name = "unknown"
 
     def load(self):
-        if not settings.lightgbm_model_pickle_path.exists():
-            raise FileNotFoundError(f"Model file not found: {settings.lightgbm_model_pickle_path}")
-        if not settings.model_report_path.exists():
-            raise FileNotFoundError(f"Report file not found: {settings.model_report_path}")
-
-        with open(settings.lightgbm_model_pickle_path, "rb") as file:
-            self.model = pickle.load(file)
-        with open(settings.model_report_path, "r", encoding="utf-8") as file:
-            report = json.load(file)
+        self.model = load_pickled_model()
+        report = load_model_report()
 
         self.categorical_columns = report.get("categorical_columns", [])
         best_model = report.get("best_model", {})

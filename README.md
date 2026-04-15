@@ -69,6 +69,35 @@ booking_cancellation/
 
 - `http://127.0.0.1:8000/docs`
 
+## MinIO / Local S3
+
+Проект поддерживает хранение артефактов модели в MinIO через S3-compatible API.
+Если S3-переменные заданы в `.env`, сервис использует MinIO как источник истины для модели и `model_comparison.json`.
+
+Поднять локальный MinIO:
+
+- `docker compose -f docker-compose.minio.yml up -d`
+
+Заполнить переменные в `.env`:
+
+- `S3_ENDPOINT_URL=http://localhost:9000`
+- `S3_BUCKET=booking-cancellation-artifacts`
+- `S3_ACCESS_KEY=<your-local-minio-user>`
+- `S3_SECRET_KEY=<your-local-minio-password>`
+- `S3_REGION=us-east-1`
+- `S3_ARTIFACTS_PREFIX=artifacts`
+- `S3_AUTO_CREATE_BUCKET=true`
+- `S3_USE_PATH_STYLE=true`
+- `MINIO_ROOT_USER=<your-local-minio-user>`
+- `MINIO_ROOT_PASSWORD=<your-local-minio-password>`
+
+Как это работает:
+
+- `train_models_cli` сохраняет артефакты локально в `artifacts/`, затем загружает их в MinIO.
+- API на старте и batch scoring CLI загружают модель и метаданные из MinIO, если S3 включен.
+- Если S3 не настроен, проект продолжает работать в локальном файловом режиме.
+- `docker-compose.minio.yml` читает MinIO credentials из локального `.env`, поэтому секреты не хранятся в репозитории.
+
 ## API
 
 - `GET /health` - healthcheck и проверка загрузки модели.

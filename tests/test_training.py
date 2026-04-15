@@ -1,5 +1,4 @@
-import json
-import pickle
+from io import BytesIO, StringIO
 
 import numpy as np
 import pandas as pd
@@ -61,7 +60,7 @@ class FakeLGBMClassifier:
         return [[0.8, 0.2] for _ in range(len(x_test))]
 
 
-def test_train_lightgbm_pipeline(monkeypatch, tmp_path):
+def test_train_lightgbm_pipeline(monkeypatch):
     raw_df = pd.DataFrame(
         [
             {
@@ -116,16 +115,45 @@ def test_train_lightgbm_pipeline(monkeypatch, tmp_path):
             "roc_auc": 0.81,
         }
 
+    mkdir_calls = []
+    persisted = {"pickle": None, "report": None}
+
+    class FakeArtifactsDir:
+        def mkdir(self, parents=False, exist_ok=False):
+            mkdir_calls.append((parents, exist_ok))
+
     class FakeSettings:
-        raw_booking_data_path = tmp_path / "dummy.csv"
+        raw_booking_data_path = "dummy.csv"
         target_column = "booking status"
         id_column = "Booking_ID"
         test_size = 0.2
         random_state = 42
-        artifacts_dir = tmp_path / "artifacts"
-        lightgbm_model_text_path = tmp_path / "artifacts" / "lightgbm_model.txt"
-        lightgbm_model_pickle_path = tmp_path / "artifacts" / "lightgbm_model.pkl"
-        model_report_path = tmp_path / "artifacts" / "model_report.json"
+        artifacts_dir = FakeArtifactsDir()
+        lightgbm_model_text_path = "artifacts/lightgbm_model.txt"
+        lightgbm_model_pickle_path = "artifacts/lightgbm_model.pkl"
+        model_report_path = "artifacts/model_report.json"
+        postgres_enabled = False
+
+    upload_calls = []
+
+    class DummyBinaryFile(BytesIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class DummyTextFile(StringIO):
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    def fake_open(path, mode="r", encoding=None):
+        if "b" in mode:
+            return DummyBinaryFile()
+        return DummyTextFile()
 
     monkeypatch.setattr("src.application.training.settings", FakeSettings)
     monkeypatch.setattr("src.application.training.pd.read_csv", fake_read_csv)
@@ -136,6 +164,19 @@ def test_train_lightgbm_pipeline(monkeypatch, tmp_path):
     monkeypatch.setattr("src.application.training.train_test_split", fake_train_test_split)
     monkeypatch.setattr("src.application.training.evaluate_model", fake_evaluate_model)
     monkeypatch.setattr("src.application.training.LGBMClassifier", FakeLGBMClassifier)
+    monkeypatch.setattr("builtins.open", fake_open)
+    monkeypatch.setattr(
+        "src.application.training.pickle.dump",
+        lambda model, file: persisted.__setitem__("pickle", model),
+    )
+    monkeypatch.setattr(
+        "src.application.training.json.dump",
+        lambda report, file, ensure_ascii=False, indent=2: persisted.__setitem__("report", report),
+    )
+    monkeypatch.setattr(
+        "src.application.training.upload_training_artifacts",
+        lambda: upload_calls.append("uploaded"),
+    )
 
     metrics, parameters, report = train_lightgbm_pipeline()
 
@@ -143,15 +184,7 @@ def test_train_lightgbm_pipeline(monkeypatch, tmp_path):
     assert parameters["n_estimators"] == 700
     assert report["best_model"]["name"] == "LightGBM"
     assert report["categorical_columns"] == ["feature_cat"]
-
-    assert FakeSettings.artifacts_dir.exists()
-    assert FakeSettings.lightgbm_model_pickle_path.exists()
-    assert FakeSettings.model_report_path.exists()
-
-    with open(FakeSettings.model_report_path, "r", encoding="utf-8") as file:
-        saved_report = json.load(file)
-    assert saved_report["best_model"]["name"] == "LightGBM"
-
-    with open(FakeSettings.lightgbm_model_pickle_path, "rb") as file:
-        saved_model = pickle.load(file)
-    assert isinstance(saved_model, FakeLGBMClassifier)
+    assert mkdir_calls == [(True, True)]
+    assert persisted["report"]["best_model"]["name"] == "LightGBM"
+    assert isinstance(persisted["pickle"], FakeLGBMClassifier)
+    assert upload_calls == ["uploaded"]
