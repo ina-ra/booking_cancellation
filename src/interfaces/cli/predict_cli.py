@@ -1,16 +1,17 @@
 import argparse
-import json
-import pickle
 
 import pandas as pd
+from sqlalchemy.exc import SQLAlchemyError
 
+from src.application.monitoring import build_batch_monitoring_metrics
 from src.application.scoring import build_scoring_table, prepare_features
 from src.config import settings
+from src.infrastructure.db.repositories import save_monitoring_metrics, save_prediction_batch
+from src.infrastructure.ml.artifacts import load_model_report, load_pickled_model
 
 
 def load_metadata():
-    with open(settings.model_report_path, "r", encoding="utf-8") as file:
-        report = json.load(file)
+    report = load_model_report()
     return report.get("categorical_columns", [])
 
 
@@ -28,9 +29,7 @@ def main():
     raw_df = pd.read_csv(args.input)
     categorical_columns = load_metadata()
     booking_ids, features, summary = prepare_features(raw_df, categorical_columns)
-
-    with open(settings.lightgbm_model_pickle_path, "rb") as file:
-        model = pickle.load(file)
+    model = load_pickled_model()
 
     probabilities = pd.Series(model.predict_proba(features)[:, 1])
     scoring_table = build_scoring_table(booking_ids, probabilities, args.risk_share)
@@ -39,6 +38,21 @@ def main():
     settings.artifacts_dir.mkdir(parents=True, exist_ok=True)
     scoring_table.to_csv(args.scores_output, index=False)
     high_risk_table.to_csv(args.high_risk_output, index=False)
+
+    if settings.postgres_enabled:
+        try:
+            save_prediction_batch(scoring_table, model_name="LightGBM")
+            save_monitoring_metrics(
+                run_type="batch_predict",
+                model_name="LightGBM",
+                metrics=build_batch_monitoring_metrics(
+                    preprocessing_summary=summary,
+                    scoring_table=scoring_table,
+                ),
+            )
+            print("Результаты batch scoring сохранены в Postgres.")
+        except SQLAlchemyError as error:
+            print(f"Не удалось сохранить predictions в Postgres: {error}")
 
     print("Входной файл:", args.input)
     print("Строк до предобработки:", summary["original_shape"][0])

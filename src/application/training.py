@@ -1,13 +1,17 @@
 import json
 import pickle
+from datetime import datetime, timezone
 
 import pandas as pd
 from lightgbm import LGBMClassifier
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score, roc_auc_score
 from sklearn.model_selection import train_test_split
 
+from src.application.monitoring import build_training_monitoring_metrics
 from src.config import settings
 from src.infrastructure.data.preprocessing import preprocess_booking_data
+from src.infrastructure.db.repositories import save_model_run, save_monitoring_metrics
+from src.infrastructure.ml.artifacts import upload_training_artifacts
 
 
 def evaluate_model(model, x_test, y_test):
@@ -105,5 +109,23 @@ def train_lightgbm_pipeline():
         pickle.dump(model, file)
     with open(settings.model_report_path, "w", encoding="utf-8") as file:
         json.dump(report, file, ensure_ascii=False, indent=2)
+    upload_training_artifacts()
+
+    if settings.postgres_enabled:
+        model_version = f"lightgbm_{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}"
+        save_model_run(
+            model_name="LightGBM",
+            model_version=model_version,
+            metrics=metrics,
+            parameters=parameters,
+        )
+        save_monitoring_metrics(
+            run_type="train",
+            model_name="LightGBM",
+            metrics=build_training_monitoring_metrics(
+                preprocessing_summary=preprocessing_summary,
+                evaluation_metrics=metrics,
+            ),
+        )
     return metrics, parameters, report
 

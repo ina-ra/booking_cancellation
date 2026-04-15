@@ -2,6 +2,16 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -21,15 +31,76 @@ class Settings:
     high_risk_bookings_path: Path
     default_high_risk_threshold: float
     default_batch_risk_share: float
+    postgres_host: str | None
+    postgres_port: int | None
+    postgres_db: str | None
+    postgres_user: str | None
+    postgres_password: str | None
+    postgres_sslmode: str | None
+    s3_endpoint_url: str | None
+    s3_bucket: str | None
+    s3_access_key: str | None
+    s3_secret_key: str | None
+    s3_region: str
+    s3_artifacts_prefix: str
+    s3_auto_create_bucket: bool
+    s3_use_path_style: bool
     target_column: str
     id_column: str
     date_column: str
     random_state: int
     test_size: float
 
+    @property
+    def postgres_enabled(self) -> bool:
+        return all(
+            [
+                self.postgres_host,
+                self.postgres_port,
+                self.postgres_db,
+                self.postgres_user,
+                self.postgres_password,
+            ]
+        )
+
+    @property
+    def postgres_url(self) -> str | None:
+        if not self.postgres_enabled:
+            return None
+
+        return (
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            f"?sslmode={self.postgres_sslmode or 'require'}"
+        )
+
+    @property
+    def s3_enabled(self) -> bool:
+        return all(
+            [
+                self.s3_endpoint_url,
+                self.s3_bucket,
+                self.s3_access_key,
+                self.s3_secret_key,
+            ]
+        )
+
+    @property
+    def lightgbm_model_text_object_name(self) -> str:
+        return f"{self.s3_artifacts_prefix}/lightgbm_model.txt"
+
+    @property
+    def lightgbm_model_pickle_object_name(self) -> str:
+        return f"{self.s3_artifacts_prefix}/lightgbm_model.pkl"
+
+    @property
+    def model_report_object_name(self) -> str:
+        return f"{self.s3_artifacts_prefix}/model_comparison.json"
+
 
 def build_settings() -> Settings:
     base_dir = Path(__file__).resolve().parents[1]
+    load_dotenv(base_dir / ".env")
     data_dir = base_dir / "data"
     raw_data_dir = data_dir / "raw"
     processed_data_dir = data_dir / "processed"
@@ -53,6 +124,24 @@ def build_settings() -> Settings:
         high_risk_bookings_path=artifacts_dir / "high_risk_bookings.csv",
         default_high_risk_threshold=float(os.getenv("DEFAULT_HIGH_RISK_THRESHOLD", "0.7")),
         default_batch_risk_share=float(os.getenv("DEFAULT_BATCH_RISK_SHARE", "0.3")),
+        postgres_host=os.getenv("POSTGRES_HOST"),
+        postgres_port=(
+            int(os.getenv("POSTGRES_PORT", "5432"))
+            if os.getenv("POSTGRES_HOST")
+            else None
+        ),
+        postgres_db=os.getenv("POSTGRES_DB"),
+        postgres_user=os.getenv("POSTGRES_USER"),
+        postgres_password=os.getenv("POSTGRES_PASSWORD"),
+        postgres_sslmode=os.getenv("POSTGRES_SSLMODE", "require"),
+        s3_endpoint_url=os.getenv("S3_ENDPOINT_URL"),
+        s3_bucket=os.getenv("S3_BUCKET"),
+        s3_access_key=os.getenv("S3_ACCESS_KEY"),
+        s3_secret_key=os.getenv("S3_SECRET_KEY"),
+        s3_region=os.getenv("S3_REGION", "us-east-1"),
+        s3_artifacts_prefix=os.getenv("S3_ARTIFACTS_PREFIX", "artifacts").strip("/"),
+        s3_auto_create_bucket=_env_flag("S3_AUTO_CREATE_BUCKET", default=True),
+        s3_use_path_style=_env_flag("S3_USE_PATH_STYLE", default=True),
         target_column="booking status",
         id_column="Booking_ID",
         date_column="date of reservation",

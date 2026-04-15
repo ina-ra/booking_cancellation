@@ -1,6 +1,3 @@
-import json
-import pickle
-
 from src.infrastructure.ml.model_loader import ModelRegistry
 
 
@@ -14,31 +11,17 @@ def test_model_registry_is_not_ready_before_load():
     assert registry.is_ready() is False
 
 
-def test_model_registry_load(monkeypatch, tmp_path):
-    model_path = tmp_path / "model.pkl"
-    report_path = tmp_path / "report.json"
-
-    with open(model_path, "wb") as file:
-        pickle.dump(DummyModel(), file)
-
-    report = {
-        "categorical_columns": ["type of meal", "room type"],
-        "best_model": {"name": "LightGBM"},
-    }
-
-    with open(report_path, "w", encoding="utf-8") as file:
-        json.dump(report, file)
-
+def test_model_registry_load(monkeypatch):
     monkeypatch.setattr(
-        "src.infrastructure.ml.model_loader.settings",
-        type(
-            "FakeSettings",
-            (),
-            {
-                "lightgbm_model_pickle_path": model_path,
-                "model_report_path": report_path,
-            },
-        )(),
+        "src.infrastructure.ml.model_loader.load_pickled_model",
+        lambda: DummyModel(),
+    )
+    monkeypatch.setattr(
+        "src.infrastructure.ml.model_loader.load_model_report",
+        lambda: {
+            "categorical_columns": ["type of meal", "room type"],
+            "best_model": {"name": "LightGBM"},
+        },
     )
 
     registry = ModelRegistry()

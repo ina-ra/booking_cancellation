@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [ main, master, develop, service ]
+    branches: [ main, master, develop, service, feature/minio-s3-tests ]
   pull_request:
-    branches: [ main, master, develop, service ]
+    branches: [ main, master, develop, service, feature/minio-s3-tests ]
 
 jobs:
   test:

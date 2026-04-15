@@ -11,14 +11,23 @@ Thumbs.db
 .venv/
 venv/
 .env
-.env.*
+# .env.*
+.envrc
+.env.local
+.env.development
+.env.production
 
 # Python cache
 __pycache__/
 *.py[cod]
+.coverage
 .pytest_cache/
+.pytest_tmp/
+.pytest_cache_local/
 .mypy_cache/
 .ruff_cache/
+pytest-cache-files-*/
+tmp*/
 
 # ML данные и модели
 # data/
@@ -46,3 +55,9 @@ catboost_info/
 # Конфиги с секретами
 config/secrets.yaml
 config/*.key
+*.pem
+*.p12
+*.crt
+*.der
+.aws/
+credentials
