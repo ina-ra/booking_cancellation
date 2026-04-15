@@ -1,5 +1,3 @@
-from io import BytesIO, StringIO
-
 import numpy as np
 import pandas as pd
 
@@ -115,45 +113,15 @@ def test_train_lightgbm_pipeline(monkeypatch):
             "roc_auc": 0.81,
         }
 
-    mkdir_calls = []
-    persisted = {"pickle": None, "report": None}
-
-    class FakeArtifactsDir:
-        def mkdir(self, parents=False, exist_ok=False):
-            mkdir_calls.append((parents, exist_ok))
-
     class FakeSettings:
         raw_booking_data_path = "dummy.csv"
         target_column = "booking status"
         id_column = "Booking_ID"
         test_size = 0.2
         random_state = 42
-        artifacts_dir = FakeArtifactsDir()
-        lightgbm_model_text_path = "artifacts/lightgbm_model.txt"
-        lightgbm_model_pickle_path = "artifacts/lightgbm_model.pkl"
-        model_report_path = "artifacts/model_report.json"
         postgres_enabled = False
 
-    upload_calls = []
-
-    class DummyBinaryFile(BytesIO):
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-    class DummyTextFile(StringIO):
-        def __enter__(self):
-            return self
-
-        def __exit__(self, exc_type, exc, tb):
-            return False
-
-    def fake_open(path, mode="r", encoding=None):
-        if "b" in mode:
-            return DummyBinaryFile()
-        return DummyTextFile()
+    upload_calls = {}
 
     monkeypatch.setattr("src.application.training.settings", FakeSettings)
     monkeypatch.setattr("src.application.training.pd.read_csv", fake_read_csv)
@@ -164,18 +132,9 @@ def test_train_lightgbm_pipeline(monkeypatch):
     monkeypatch.setattr("src.application.training.train_test_split", fake_train_test_split)
     monkeypatch.setattr("src.application.training.evaluate_model", fake_evaluate_model)
     monkeypatch.setattr("src.application.training.LGBMClassifier", FakeLGBMClassifier)
-    monkeypatch.setattr("builtins.open", fake_open)
-    monkeypatch.setattr(
-        "src.application.training.pickle.dump",
-        lambda model, file: persisted.__setitem__("pickle", model),
-    )
-    monkeypatch.setattr(
-        "src.application.training.json.dump",
-        lambda report, file, ensure_ascii=False, indent=2: persisted.__setitem__("report", report),
-    )
     monkeypatch.setattr(
         "src.application.training.upload_training_artifacts",
-        lambda: upload_calls.append("uploaded"),
+        lambda model, report: upload_calls.update({"model": model, "report": report}),
     )
 
     metrics, parameters, report = train_lightgbm_pipeline()
@@ -184,7 +143,5 @@ def test_train_lightgbm_pipeline(monkeypatch):
     assert parameters["n_estimators"] == 700
     assert report["best_model"]["name"] == "LightGBM"
     assert report["categorical_columns"] == ["feature_cat"]
-    assert mkdir_calls == [(True, True)]
-    assert persisted["report"]["best_model"]["name"] == "LightGBM"
-    assert isinstance(persisted["pickle"], FakeLGBMClassifier)
-    assert upload_calls == ["uploaded"]
+    assert isinstance(upload_calls["model"], FakeLGBMClassifier)
+    assert upload_calls["report"]["best_model"]["name"] == "LightGBM"

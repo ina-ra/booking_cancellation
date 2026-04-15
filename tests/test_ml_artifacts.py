@@ -1,8 +1,7 @@
-import json
 import pickle
-from pathlib import Path
 
 from src.infrastructure.ml.artifacts import (
+    ensure_s3_storage,
     load_model_report,
     load_pickled_model,
     upload_training_artifacts,
@@ -14,22 +13,48 @@ class DummyModel:
         return [[0.1, 0.9]]
 
 
-def test_load_model_report_from_local_file(monkeypatch):
-    report_path = Path("artifacts/model_report.json")
+class DummyBooster:
+    def model_to_string(self):
+        return "tree dump"
 
-    monkeypatch.setattr(
-        "src.infrastructure.ml.artifacts.settings",
-        type("FakeSettings", (), {"model_report_path": report_path})(),
-    )
+
+class UploadableModel:
+    def __init__(self):
+        self.booster_ = DummyBooster()
+
+
+def test_ensure_s3_storage_raises_when_s3_is_disabled(monkeypatch):
     monkeypatch.setattr(
         "src.infrastructure.ml.artifacts.artifact_storage",
         type("FakeStorage", (), {"is_enabled": lambda self: False})(),
     )
+
+    try:
+        ensure_s3_storage()
+    except RuntimeError as error:
+        assert "S3 storage is required" in str(error)
+    else:
+        raise AssertionError("ensure_s3_storage() should raise when S3 is disabled")
+
+
+def test_load_model_report_from_s3(monkeypatch):
+    payload = b'{"best_model": {"name": "LightGBM"}}'
+
     monkeypatch.setattr(
-        "src.infrastructure.ml.artifacts._read_text_file",
-        lambda path: json.dumps({"best_model": {"name": "LightGBM"}}),
+        "src.infrastructure.ml.artifacts.settings",
+        type("FakeSettings", (), {"model_report_object_name": "artifacts/model_report.json"})(),
     )
-    monkeypatch.setattr(Path, "exists", lambda self: self == report_path)
+    monkeypatch.setattr(
+        "src.infrastructure.ml.artifacts.artifact_storage",
+        type(
+            "FakeStorage",
+            (),
+            {
+                "is_enabled": lambda self: True,
+                "download_bytes": lambda self, object_name: payload,
+            },
+        )(),
+    )
 
     report = load_model_report()
 
@@ -61,11 +86,9 @@ def test_load_pickled_model_from_s3(monkeypatch):
 
 
 def test_upload_training_artifacts_to_s3(monkeypatch):
-    text_path = Path("artifacts/lightgbm_model.txt")
-    pickle_path = Path("artifacts/lightgbm_model.pkl")
-    report_path = Path("artifacts/model_report.json")
-
     uploads = []
+    model = UploadableModel()
+    report = {"best_model": {"name": "LightGBM"}}
 
     monkeypatch.setattr(
         "src.infrastructure.ml.artifacts.settings",
@@ -73,11 +96,8 @@ def test_upload_training_artifacts_to_s3(monkeypatch):
             "FakeSettings",
             (),
             {
-                "lightgbm_model_text_path": text_path,
                 "lightgbm_model_text_object_name": "artifacts/lightgbm_model.txt",
-                "lightgbm_model_pickle_path": pickle_path,
                 "lightgbm_model_pickle_object_name": "artifacts/lightgbm_model.pkl",
-                "model_report_path": report_path,
                 "model_report_object_name": "artifacts/model_report.json",
             },
         )(),
@@ -89,17 +109,30 @@ def test_upload_training_artifacts_to_s3(monkeypatch):
             (),
             {
                 "is_enabled": lambda self: True,
-                "upload_file": lambda self, local_path, object_name: uploads.append(
-                    (local_path.name, object_name)
+                "upload_text": lambda self, payload, object_name, content_type: uploads.append(
+                    ("text", payload, object_name, content_type)
+                ),
+                "upload_bytes": lambda self, payload, object_name, content_type: uploads.append(
+                    ("bytes", payload, object_name, content_type)
                 ),
             },
         )(),
     )
 
-    upload_training_artifacts()
+    upload_training_artifacts(model, report)
 
-    assert uploads == [
-        ("lightgbm_model.txt", "artifacts/lightgbm_model.txt"),
-        ("lightgbm_model.pkl", "artifacts/lightgbm_model.pkl"),
-        ("model_report.json", "artifacts/model_report.json"),
-    ]
+    assert uploads[0] == (
+        "text",
+        "tree dump",
+        "artifacts/lightgbm_model.txt",
+        "text/plain; charset=utf-8",
+    )
+    assert uploads[1][0] == "bytes"
+    assert uploads[1][2] == "artifacts/lightgbm_model.pkl"
+    assert uploads[1][3] == "application/octet-stream"
+    assert uploads[2] == (
+        "text",
+        '{\n  "best_model": {\n    "name": "LightGBM"\n  }\n}',
+        "artifacts/model_report.json",
+        "application/json",
+    )
