@@ -132,7 +132,7 @@ def test_upload_file_uses_bucket_and_object_name():
         ("head_bucket", "booking-cancellation-artifacts"),
         (
             "upload_file",
-            "artifacts\\model.pkl",
+            str(Path("artifacts/model.pkl")),
             "booking-cancellation-artifacts",
             "artifacts/model.pkl",
         ),
