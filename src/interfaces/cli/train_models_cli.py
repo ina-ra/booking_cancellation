@@ -5,14 +5,14 @@ from src.config import settings
 
 
 def main():
-    metrics, parameters, _ = train_lightgbm_pipeline()
+    result = train_lightgbm_pipeline()
     print("\nLightGBM")
     print("--------")
-    for metric_name, value in metrics.items():
+    for metric_name, value in result.metrics.items():
         print(f"{metric_name}: {value}")
-    print("\nПараметры LightGBM:")
-    print(json.dumps(parameters, ensure_ascii=False, indent=2))
-    print("\nОтчёт сохранён в:", settings.model_report_path)
+    print("\nLightGBM parameters:")
+    print(json.dumps(result.parameters, ensure_ascii=False, indent=2))
+    print("\nModel artifacts uploaded to S3:", settings.model_report_object_name)
 
 
 if __name__ == "__main__":

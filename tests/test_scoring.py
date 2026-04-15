@@ -52,6 +52,26 @@ def test_build_single_prediction_returns_expected_structure(monkeypatch, sample_
     assert result["risk_segment"] == "high_risk"
 
 
+def test_build_single_prediction_uses_booking_entity(monkeypatch, sample_booking_payload):
+    fake_features = pd.DataFrame([{"lead time": 45, "average price": 120.5}])
+
+    def fake_prepare_features(df, categorical_columns):
+        assert df.iloc[0]["Booking_ID"] == "INN00001"
+        assert df.iloc[0]["lead time"] == 45
+        return pd.Series(["INN00001"]), fake_features, {"processed_shape": (1, 2)}
+
+    monkeypatch.setattr("src.application.scoring.prepare_features", fake_prepare_features)
+
+    result = build_single_prediction(
+        sample_booking_payload,
+        FakeModel([0.25]),
+        categorical_columns=[],
+    )
+
+    assert result["booking_id"] == "INN00001"
+    assert result["probability_of_cancellation"] == 0.25
+
+
 def test_build_batch_predictions_returns_records(monkeypatch, sample_batch_payload):
     fake_features = pd.DataFrame(
         [
@@ -80,3 +100,5 @@ def test_build_batch_predictions_returns_records(monkeypatch, sample_batch_paylo
     assert result[0]["booking_id"] == "INN00099"
     assert result[0]["is_high_risk"] == 1
     assert result[1]["booking_id"] == "INN00001"
+    assert result[0]["rank"] == 1
+    assert result[0]["risk_percentile"] == 50.0

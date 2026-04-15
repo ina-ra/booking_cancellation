@@ -137,11 +137,11 @@ def test_train_lightgbm_pipeline(monkeypatch):
         lambda model, report: upload_calls.update({"model": model, "report": report}),
     )
 
-    metrics, parameters, report = train_lightgbm_pipeline()
+    result = train_lightgbm_pipeline()
 
-    assert metrics["accuracy"] == 0.8
-    assert parameters["n_estimators"] == 700
-    assert report["best_model"]["name"] == "LightGBM"
-    assert report["categorical_columns"] == ["feature_cat"]
+    assert result.metrics["accuracy"] == 0.8
+    assert result.parameters["n_estimators"] == 700
+    assert result.report["best_model"]["name"] == "LightGBM"
+    assert result.report["categorical_columns"] == ["feature_cat"]
     assert isinstance(upload_calls["model"], FakeLGBMClassifier)
     assert upload_calls["report"]["best_model"]["name"] == "LightGBM"
