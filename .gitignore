@@ -11,7 +11,11 @@ Thumbs.db
 .venv/
 venv/
 .env
-.env.*
+# .env.*
+.envrc
+.env.local
+.env.development
+.env.production
 
 # Python cache
 __pycache__/
@@ -46,3 +50,9 @@ catboost_info/
 # Конфиги с секретами
 config/secrets.yaml
 config/*.key
+*.pem
+*.p12
+*.crt
+*.der
+.aws/
+credentials

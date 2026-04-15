@@ -2,6 +2,8 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 
 @dataclass(frozen=True)
 class Settings:
@@ -21,15 +23,45 @@ class Settings:
     high_risk_bookings_path: Path
     default_high_risk_threshold: float
     default_batch_risk_share: float
+    postgres_host: str | None
+    postgres_port: int | None
+    postgres_db: str | None
+    postgres_user: str | None
+    postgres_password: str | None
+    postgres_sslmode: str | None
     target_column: str
     id_column: str
     date_column: str
     random_state: int
     test_size: float
 
+    @property
+    def postgres_enabled(self) -> bool:
+        return all(
+            [
+                self.postgres_host,
+                self.postgres_port,
+                self.postgres_db,
+                self.postgres_user,
+                self.postgres_password,
+            ]
+        )
+
+    @property
+    def postgres_url(self) -> str | None:
+        if not self.postgres_enabled:
+            return None
+
+        return (
+            f"postgresql+psycopg://{self.postgres_user}:{self.postgres_password}"
+            f"@{self.postgres_host}:{self.postgres_port}/{self.postgres_db}"
+            f"?sslmode={self.postgres_sslmode or 'require'}"
+        )
+
 
 def build_settings() -> Settings:
     base_dir = Path(__file__).resolve().parents[1]
+    load_dotenv(base_dir / ".env")
     data_dir = base_dir / "data"
     raw_data_dir = data_dir / "raw"
     processed_data_dir = data_dir / "processed"
@@ -53,6 +85,12 @@ def build_settings() -> Settings:
         high_risk_bookings_path=artifacts_dir / "high_risk_bookings.csv",
         default_high_risk_threshold=float(os.getenv("DEFAULT_HIGH_RISK_THRESHOLD", "0.7")),
         default_batch_risk_share=float(os.getenv("DEFAULT_BATCH_RISK_SHARE", "0.3")),
+        postgres_host=os.getenv("POSTGRES_HOST"),
+        postgres_port=int(os.getenv("POSTGRES_PORT", "5432")) if os.getenv("POSTGRES_HOST") else None,
+        postgres_db=os.getenv("POSTGRES_DB"),
+        postgres_user=os.getenv("POSTGRES_USER"),
+        postgres_password=os.getenv("POSTGRES_PASSWORD"),
+        postgres_sslmode=os.getenv("POSTGRES_SSLMODE", "require"),
         target_column="booking status",
         id_column="Booking_ID",
         date_column="date of reservation",

@@ -7,6 +7,7 @@
 ## Архитектура
 
 Код организован по Clean Architecture:
+
 - `src/domain` - доменные сущности и бизнес-правила определения риска.
 - `src/application` - use cases и прикладная логика scoring/training.
 - `src/infrastructure` - адаптеры предобработки, загрузки модели и работы с файлами.
@@ -51,17 +52,21 @@ booking_cancellation/
 ## Локальный запуск
 
 Подготовить окружение:
+
 - скопировать `.env.example` в `.env`;
 - заполнить переменные под локальную среду при необходимости.
 
 Установить зависимости:
+
 - `py -m pip install -r requirements.txt`
 - `py -m pip install -r requirements-dev.txt`
 
 Запустить API:
+
 - `py -m uvicorn app.main:app --reload`
 
 Открыть Swagger UI:
+
 - `http://127.0.0.1:8000/docs`
 
 ## API
