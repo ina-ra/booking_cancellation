@@ -43,7 +43,7 @@
 Базовые локальные значения:
 
 - `POSTGRES_HOST=localhost`
-- `POSTGRES_PORT=5432`
+- `POSTGRES_PORT=5433`
 - `POSTGRES_DB=booking_cancellation`
 - `POSTGRES_USER=booking_user`
 - `POSTGRES_SSLMODE=disable`
@@ -204,6 +204,9 @@ py -m src.interfaces.cli.predict_cli --run-date 2026-04-16 --force
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1
 ```
+
+Why `5433` instead of `5432`:
+This avoids accidentally connecting host-side Python commands to some other local Postgres already listening on `localhost:5432`. The app on your machine should talk to Docker Postgres through `localhost:5433`, while Airflow tasks inside Docker still use the internal Docker hostname `postgres:5432`.
 
 Если нужен только Airflow без повторной инициализации БД и без обучения модели, можно использовать отдельный скрипт:
 
