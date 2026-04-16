@@ -4,9 +4,9 @@ import os
 from datetime import timedelta
 
 import pendulum
-from airflow.providers.docker.operators.docker import DockerOperator
 
 from airflow import DAG
+from airflow.providers.docker.operators.docker import DockerOperator
 
 
 def build_batch_environment() -> dict[str, str]:
