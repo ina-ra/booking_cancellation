@@ -61,6 +61,10 @@ disable = [
     "missing-class-docstring",
     "missing-function-docstring",
     "too-few-public-methods",
+    "trailing-newlines",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "import-outside-toplevel",
 ]
 
 [tool.pylint.design]
