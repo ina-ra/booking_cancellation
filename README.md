@@ -67,6 +67,10 @@
 - `MINIO_ROOT_USER = S3_ACCESS_KEY`
 - `MINIO_ROOT_PASSWORD = S3_SECRET_KEY`
 
+Для batch-результатов в S3 используется отдельный префикс:
+
+- `S3_BATCH_OUTPUTS_PREFIX=batch-runs`
+
 ### 2. Установить зависимости
 
 ```powershell
@@ -159,6 +163,68 @@ py -m src.interfaces.cli.predict_cli --run-date 2026-04-16
 - `artifacts/batch_runs/2026-04-16/high_risk_bookings.csv`
 
 Это удобно для детерминированного запуска batch-задач и дальнейшего внедрения идемпотентности и backfill.
+
+Если run-date уже был успешно обработан, batch CLI увидит `_SUCCESS` marker в S3 и пропустит повторный запуск.
+Для принудительного пересчёта можно использовать:
+
+```powershell
+py -m src.interfaces.cli.predict_cli --run-date 2026-04-16 --force
+```
+
+## Airflow
+
+Для batch-сервиса в проект добавлен Airflow DAG:
+
+- `airflow/dags/batch_scoring_dag.py`
+
+Что он делает:
+
+- запускает batch scoring по расписанию `@daily`;
+- использует `DockerOperator`;
+- передаёт в контейнер логическую дату запуска как `{{ ds }}`;
+- запускает batch-контейнер в docker-сети `booking_cancellation_default`;
+- работает с `Postgres` и `MinIO` через контейнерные адреса `postgres` и `minio`;
+- поддерживает catchup и backfill.
+
+Текущая структура DAG:
+
+1. `check_batch_not_processed` — проверяет, есть ли `_SUCCESS` marker для run-date;
+2. `run_batch_scoring` — запускает основной batch scoring в контейнере;
+3. `verify_batch_outputs` — проверяет, что результаты и `_SUCCESS` marker появились в S3.
+
+### Поднять Airflow локально
+
+Сначала инфраструктура проекта уже должна быть поднята:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1
+```
+
+Потом запустить Airflow:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_airflow.ps1
+```
+
+После старта:
+
+- Airflow UI: `http://127.0.0.1:8081`
+- логин/пароль по умолчанию: `airflow / airflow`
+
+### Backfill
+
+У DAG включён `catchup=True`, поэтому прошлые логические даты можно дообработать.
+
+Пример backfill за три дня:
+
+```powershell
+docker compose -f docker-compose.airflow.yml exec airflow-standalone airflow dags backfill booking_batch_scoring --start-date 2026-04-14 --end-date 2026-04-16
+```
+
+Идемпотентность обеспечивается двумя слоями:
+
+- output paths partitioned by `run_date`;
+- `_SUCCESS` marker в S3 не даёт повторно выполнить уже успешный batch-run без `--force`.
 
 ## API
 
