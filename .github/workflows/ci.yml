@@ -2,9 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, master, develop, service, feature/minio-s3-tests, feature/s3-only-cleanup]
   pull_request:
-    branches: [main, master, develop, service, feature/minio-s3-tests, feature/s3-only-cleanup]
 
 jobs:
   test:
