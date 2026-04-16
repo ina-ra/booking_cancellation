@@ -16,6 +16,7 @@ class FakeSession:
         self.added = []
         self.committed = False
         self.rolled_back = False
+        self.deleted_filters = []
 
     def __enter__(self):
         return self
@@ -33,6 +34,23 @@ class FakeSession:
 
     def rollback(self):
         self.rolled_back = True
+
+    def query(self, model):
+        return FakeQuery(self, model)
+
+
+class FakeQuery:
+    def __init__(self, session, model):
+        self.session = session
+        self.model = model
+        self.filters = {}
+
+    def filter_by(self, **kwargs):
+        self.filters = kwargs
+        return self
+
+    def delete(self):
+        self.session.deleted_filters.append((self.model, self.filters))
 
 
 def make_session_factory(session):
@@ -107,13 +125,17 @@ def test_save_prediction_batch_persists_prediction_records(monkeypatch):
         ]
     )
 
-    save_prediction_batch(scores, model_name="LightGBM")
+    save_prediction_batch(scores, model_name="LightGBM", run_date="2026-04-16")
 
     assert session.committed is True
     assert len(session.added) == 2
     assert all(isinstance(item, PredictionRecord) for item in session.added)
+    assert session.deleted_filters == [
+        (PredictionRecord, {"model_name": "LightGBM", "run_date": "2026-04-16"})
+    ]
     assert session.added[0].booking_id == "INN001"
     assert session.added[0].is_high_risk is True
+    assert session.added[0].run_date == "2026-04-16"
 
 
 def test_save_monitoring_metrics_persists_monitoring_rows(monkeypatch):
@@ -127,13 +149,21 @@ def test_save_monitoring_metrics_persists_monitoring_rows(monkeypatch):
         run_type="train",
         model_name="LightGBM",
         metrics={"records_before_preprocessing": 120.0, "eval_accuracy": 0.91},
+        run_date="2026-04-16",
     )
 
     assert session.committed is True
     assert len(session.added) == 2
     assert all(isinstance(item, MonitoringMetric) for item in session.added)
+    assert session.deleted_filters == [
+        (
+            MonitoringMetric,
+            {"run_type": "train", "model_name": "LightGBM", "run_date": "2026-04-16"},
+        )
+    ]
     assert session.added[0].run_type == "train"
     assert session.added[1].metric_name == "eval_accuracy"
+    assert session.added[0].run_date == "2026-04-16"
 
 
 def test_save_monitoring_metrics_rolls_back_on_error(monkeypatch):

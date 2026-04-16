@@ -1,36 +1,4 @@
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: booking-cancellation-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB}
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  minio:
-    image: minio/minio:latest
-    container_name: booking-cancellation-minio
-    restart: unless-stopped
-    command: server /data --console-address ":9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    ports:
-      - "9000:9000"
-      - "9001:9001"
-    volumes:
-      - minio_data:/data
-
   airflow-standalone:
     image: apache/airflow:2.10.5-python3.11
     container_name: booking-cancellation-airflow
@@ -52,11 +20,6 @@ services:
             --email admin@example.com;
         fi && \
         airflow scheduler & exec airflow webserver
-    depends_on:
-      postgres:
-        condition: service_healthy
-      minio:
-        condition: service_started
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "false"
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
@@ -84,6 +47,31 @@ services:
     ports:
       - "8081:8080"
 
-volumes:
-  postgres_data:
-  minio_data:
+  airflow-cli:
+    image: apache/airflow:2.10.5-python3.11
+    container_name: booking-cancellation-airflow-cli
+    environment:
+      AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+      _AIRFLOW_WWW_USER_CREATE: "true"
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME:?Set AIRFLOW_ADMIN_USERNAME in .env}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?Set AIRFLOW_ADMIN_PASSWORD in .env}
+      _PIP_ADDITIONAL_REQUIREMENTS: apache-airflow-providers-docker
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_REGION: ${S3_REGION}
+      S3_ARTIFACTS_PREFIX: ${S3_ARTIFACTS_PREFIX}
+      S3_BATCH_OUTPUTS_PREFIX: ${S3_BATCH_OUTPUTS_PREFIX}
+      S3_AUTO_CREATE_BUCKET: ${S3_AUTO_CREATE_BUCKET}
+      S3_USE_PATH_STYLE: ${S3_USE_PATH_STYLE}
+      DEFAULT_BATCH_RISK_SHARE: ${DEFAULT_BATCH_RISK_SHARE}
+    volumes:
+      - ./airflow/dags:/opt/airflow/dags
+      - ./airflow/logs:/opt/airflow/logs
+      - /var/run/docker.sock:/var/run/docker.sock
+    entrypoint: /bin/bash
+    stdin_open: true
+    tty: true

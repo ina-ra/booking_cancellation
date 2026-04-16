@@ -27,11 +27,17 @@ def save_model_run(model_name: str, model_version: str, metrics: dict, parameter
             raise
 
 
-def save_prediction_batch(scores, model_name: str = "LightGBM"):
+def save_prediction_batch(scores, model_name: str = "LightGBM", run_date: str | None = None):
     session_factory = get_session_factory()
+    effective_run_date = run_date or "adhoc"
 
     with session_factory() as session:
         try:
+            if hasattr(session, "query"):
+                session.query(PredictionRecord).filter_by(
+                    model_name=model_name,
+                    run_date=effective_run_date,
+                ).delete()
             for item in scores.to_dict(orient="records"):
                 session.add(
                     PredictionRecord(
@@ -42,6 +48,7 @@ def save_prediction_batch(scores, model_name: str = "LightGBM"):
                         is_high_risk=bool(item["is_high_risk"]),
                         risk_segment=str(item["risk_segment"]),
                         model_name=model_name,
+                        run_date=effective_run_date,
                     )
                 )
             session.commit()
@@ -50,11 +57,23 @@ def save_prediction_batch(scores, model_name: str = "LightGBM"):
             raise
 
 
-def save_monitoring_metrics(run_type: str, model_name: str, metrics: dict[str, float]):
+def save_monitoring_metrics(
+    run_type: str,
+    model_name: str,
+    metrics: dict[str, float],
+    run_date: str | None = None,
+):
     session_factory = get_session_factory()
+    effective_run_date = run_date or "adhoc"
 
     with session_factory() as session:
         try:
+            if hasattr(session, "query"):
+                session.query(MonitoringMetric).filter_by(
+                    run_type=run_type,
+                    model_name=model_name,
+                    run_date=effective_run_date,
+                ).delete()
             for metric_name, metric_value in metrics.items():
                 session.add(
                     MonitoringMetric(
@@ -62,6 +81,7 @@ def save_monitoring_metrics(run_type: str, model_name: str, metrics: dict[str, f
                         metric_name=metric_name,
                         metric_value=float(metric_value),
                         model_name=model_name,
+                        run_date=effective_run_date,
                     )
                 )
             session.commit()

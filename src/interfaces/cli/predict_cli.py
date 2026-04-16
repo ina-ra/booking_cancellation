@@ -10,6 +10,7 @@ from src.application.scoring import build_scoring_table, prepare_features
 from src.config import settings
 from src.infrastructure.db.repositories import save_monitoring_metrics, save_prediction_batch
 from src.infrastructure.ml.artifacts import load_model_report, load_pickled_model
+from src.infrastructure.storage import batch_run_exists, upload_batch_outputs
 
 
 def load_metadata():
@@ -43,11 +44,20 @@ def parse_args():
             "When set, outputs are written to artifacts/batch_runs/<run-date>/."
         ),
     )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Ignore existing success marker for the same run date and recompute outputs.",
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+    if args.run_date and not args.force and batch_run_exists(args.run_date):
+        print(f"Batch run for {args.run_date} is already marked as successful in S3. Skipping.")
+        return
+
     scores_output = build_batch_output_path(Path(args.scores_output), args.run_date)
     high_risk_output = build_batch_output_path(Path(args.high_risk_output), args.run_date)
 
@@ -67,7 +77,11 @@ def main():
 
     if settings.postgres_enabled:
         try:
-            save_prediction_batch(scoring_table, model_name="LightGBM")
+            save_prediction_batch(
+                scoring_table,
+                model_name="LightGBM",
+                run_date=args.run_date,
+            )
             save_monitoring_metrics(
                 run_type="batch_predict",
                 model_name="LightGBM",
@@ -75,10 +89,16 @@ def main():
                     preprocessing_summary=summary,
                     scoring_table=scoring_table,
                 ),
+                run_date=args.run_date,
             )
             print("Batch scoring results were saved to Postgres.")
         except SQLAlchemyError as error:
             print(f"Failed to save predictions to Postgres: {error}")
+            raise
+
+    if args.run_date:
+        upload_batch_outputs(args.run_date, scoring_table, high_risk_table)
+        print("Batch outputs and success marker were uploaded to S3.")
 
     print("Input file:", args.input)
     print("Rows before preprocessing:", summary["original_shape"][0])

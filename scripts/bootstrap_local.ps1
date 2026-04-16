@@ -1,5 +1,6 @@
 param(
-    [switch]$SkipTraining
+    [switch]$SkipTraining,
+    [switch]$SkipAirflow
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,8 +14,16 @@ if (-not (Test-Path $pythonExe)) {
 
 Push-Location $projectRoot
 try {
+    if (-not $SkipAirflow) {
+        Write-Host "Building application image for DockerOperator..." -ForegroundColor Cyan
+        docker build -t booking-cancellation-app:latest .
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to build booking-cancellation-app:latest."
+        }
+    }
+
     Write-Host "Starting local Postgres and MinIO..." -ForegroundColor Cyan
-    docker compose -f docker-compose.local.yml up -d
+    docker compose -f docker-compose.local.yml up -d postgres minio
     if ($LASTEXITCODE -ne 0) {
         throw "Failed to start local infrastructure via docker compose."
     }
@@ -33,6 +42,14 @@ try {
         }
     }
 
+    if (-not $SkipAirflow) {
+        Write-Host "Starting Airflow after database and model initialization..." -ForegroundColor Cyan
+        docker compose -f docker-compose.local.yml up -d airflow-standalone
+        if ($LASTEXITCODE -ne 0) {
+            throw "Failed to start Airflow."
+        }
+    }
+
     Write-Host ""
     Write-Host "Local stack is ready." -ForegroundColor Green
     Write-Host "Start API with:" -ForegroundColor Green
@@ -41,6 +58,12 @@ try {
     Write-Host "  http://127.0.0.1:8000/docs"
     Write-Host "MinIO console:" -ForegroundColor Green
     Write-Host "  http://127.0.0.1:9001"
+    if (-not $SkipAirflow) {
+        Write-Host "Airflow UI:" -ForegroundColor Green
+        Write-Host "  http://127.0.0.1:8081"
+        Write-Host "Airflow login:" -ForegroundColor Green
+        Write-Host "  Read AIRFLOW_ADMIN_USERNAME / AIRFLOW_ADMIN_PASSWORD from .env"
+    }
 }
 catch {
     Write-Host ""

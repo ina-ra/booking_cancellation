@@ -89,5 +89,15 @@ class S3ArtifactStorage:
         body = cast(Any, response["Body"])
         return cast(bytes, body.read())
 
+    def object_exists(self, object_name: str) -> bool:
+        try:
+            self.client.head_object(Bucket=self.settings.s3_bucket, Key=object_name)
+            return True
+        except ClientError as error:
+            error_code = error.response.get("Error", {}).get("Code", "")
+            if error_code in {"404", "NoSuchKey", "NotFound"}:
+                return False
+            raise
+
 
 artifact_storage = S3ArtifactStorage()

@@ -18,6 +18,7 @@ class FakeClient:
     def __init__(self):
         self.calls = []
         self.head_bucket_error = None
+        self.head_object_error = None
 
     def head_bucket(self, Bucket):
         self.calls.append(("head_bucket", Bucket))
@@ -36,6 +37,11 @@ class FakeClient:
     def get_object(self, Bucket, Key):
         self.calls.append(("get_object", Bucket, Key))
         return {"Body": DummyBody(b"payload")}
+
+    def head_object(self, Bucket, Key):
+        self.calls.append(("head_object", Bucket, Key))
+        if self.head_object_error is not None:
+            raise self.head_object_error
 
 
 def build_settings(**overrides):
@@ -195,3 +201,27 @@ def test_upload_text_encodes_payload():
             },
         ),
     ]
+
+
+def test_object_exists_returns_true_when_head_object_succeeds():
+    fake_client = FakeClient()
+    storage = S3ArtifactStorage(build_settings())
+    storage._client = fake_client
+
+    result = storage.object_exists("batch-runs/2026-04-16/_SUCCESS.json")
+
+    assert result is True
+    assert fake_client.calls == [
+        ("head_object", "booking-cancellation-artifacts", "batch-runs/2026-04-16/_SUCCESS.json")
+    ]
+
+
+def test_object_exists_returns_false_when_object_is_missing():
+    fake_client = FakeClient()
+    fake_client.head_object_error = build_client_error("404")
+    storage = S3ArtifactStorage(build_settings())
+    storage._client = fake_client
+
+    result = storage.object_exists("batch-runs/2026-04-16/_SUCCESS.json")
+
+    assert result is False

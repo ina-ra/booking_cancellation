@@ -44,6 +44,7 @@ class Settings:
     s3_secret_key: str | None
     s3_region: str
     s3_artifacts_prefix: str
+    s3_batch_outputs_prefix: str
     s3_auto_create_bucket: bool
     s3_use_path_style: bool
     target_column: str
@@ -98,6 +99,10 @@ class Settings:
     def model_report_object_name(self) -> str:
         return f"{self.s3_artifacts_prefix}/model_comparison.json"
 
+    @property
+    def batch_outputs_prefix(self) -> str:
+        return self.s3_batch_outputs_prefix.strip("/")
+
 
 def build_settings() -> Settings:
     # Resolve the project root once so every other path can be derived from it.
@@ -148,6 +153,7 @@ def build_settings() -> Settings:
         s3_secret_key=os.getenv("S3_SECRET_KEY"),
         s3_region=os.getenv("S3_REGION", "us-east-1"),
         s3_artifacts_prefix=os.getenv("S3_ARTIFACTS_PREFIX", "artifacts").strip("/"),
+        s3_batch_outputs_prefix=os.getenv("S3_BATCH_OUTPUTS_PREFIX", "batch-runs").strip("/"),
         s3_auto_create_bucket=_env_flag("S3_AUTO_CREATE_BUCKET", default=True),
         s3_use_path_style=_env_flag("S3_USE_PATH_STYLE", default=True),
         # Dataset-specific column names and reproducibility parameters.

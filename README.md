@@ -61,6 +61,8 @@
 - `S3_SECRET_KEY`
 - `MINIO_ROOT_USER`
 - `MINIO_ROOT_PASSWORD`
+- `AIRFLOW_ADMIN_USERNAME`
+- `AIRFLOW_ADMIN_PASSWORD`
 
 Обычно удобно использовать одинаковые пары:
 
@@ -102,10 +104,12 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1
 
 Что делает скрипт:
 
-1. поднимает `Postgres` и `MinIO` через `docker-compose.local.yml`;
-2. инициализирует таблицы в Postgres;
-3. обучает модель;
-4. загружает артефакты модели в S3/MinIO.
+1. собирает Docker-образ `booking-cancellation-app:latest` для `DockerOperator`;
+2. поднимает `Postgres` и `MinIO` через `docker-compose.local.yml`;
+3. инициализирует таблицы в Postgres;
+4. обучает модель;
+5. загружает артефакты модели в S3/MinIO.
+6. только после этого поднимает `Airflow`, чтобы DAG не стартовал раньше готовности БД и модели.
 
 Если хотите сделать это вручную:
 
@@ -126,6 +130,7 @@ py -m uvicorn src.interfaces.main:app --reload
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - health check: `http://127.0.0.1:8000/health`
 - MinIO console: `http://127.0.0.1:9001`
+- Airflow UI: `http://127.0.0.1:8081`
 
 ## Что считается успешным запуском
 
@@ -194,13 +199,13 @@ py -m src.interfaces.cli.predict_cli --run-date 2026-04-16 --force
 
 ### Поднять Airflow локально
 
-Сначала инфраструктура проекта уже должна быть поднята:
+Теперь отдельный старт Airflow не обязателен: стандартный локальный bootstrap уже поднимает `Postgres`, `MinIO` и `Airflow` одной командой:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1
 ```
 
-Потом запустить Airflow:
+Если нужен только Airflow без повторной инициализации БД и без обучения модели, можно использовать отдельный скрипт:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_airflow.ps1
@@ -209,7 +214,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_airflow.ps1
 После старта:
 
 - Airflow UI: `http://127.0.0.1:8081`
-- логин/пароль по умолчанию: `airflow / airflow`
+- логин: значения `AIRFLOW_ADMIN_USERNAME` / `AIRFLOW_ADMIN_PASSWORD` из `.env`
 
 ### Backfill
 
@@ -218,7 +223,7 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_airflow.ps1
 Пример backfill за три дня:
 
 ```powershell
-docker compose -f docker-compose.airflow.yml exec airflow-standalone airflow dags backfill booking_batch_scoring --start-date 2026-04-14 --end-date 2026-04-16
+docker compose -f docker-compose.local.yml exec airflow-standalone airflow dags backfill booking_batch_scoring --start-date 2026-04-14 --end-date 2026-04-16
 ```
 
 Идемпотентность обеспечивается двумя слоями:
@@ -251,12 +256,13 @@ pytest --basetemp=.pytest_tmp -o cache_dir=.pytest_cache_local
 
 `Dockerfile` нужен для контейнеризации приложения: он собирает воспроизводимый образ с Python, зависимостями и кодом сервиса.
 
-`docker-compose.local.yml` нужен для удобного локального старта инфраструктуры:
+`docker-compose.local.yml` нужен для удобного локального старта всей инфраструктуры:
 
 - `Postgres`
 - `MinIO`
+- `Airflow`
 
-Это подготовка к следующему этапу — batch-сервису на Airflow с `DockerOperator`.
+Это позволяет поднимать проект и batch-окружение одной командой.
 
 ## Deploy
 

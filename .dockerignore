@@ -1,0 +1,16 @@
+.git
+.github
+.mypy_cache
+.pytest_cache
+.pytest_tmp
+.pytest_cache_local
+.ruff_cache
+.vscode
+venv
+__pycache__
+*.pyc
+.env
+artifacts
+airflow/logs
+pytest-cache-files-*
+tmp*
