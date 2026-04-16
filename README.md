@@ -1,21 +1,20 @@
-﻿# Booking Cancellation Prediction Service
+# Booking Cancellation Prediction Service
 
-Сервис предсказывает вероятность отмены бронирования в гостиничном бизнесе.
-
-Проект оценивает риск отмены по признакам бронирования и использует прогноз в трёх сценариях:
+Сервис предсказывает вероятность отмены бронирования в гостиничном бизнесе и поддерживает:
 
 - online inference для одного бронирования;
-- batch scoring для списка бронирований;
-- мониторинг качества модели и процесса предобработки.
+- batch scoring для набора бронирований;
+- сохранение ML- и технических метрик в Postgres;
+- хранение модельных артефактов в S3-compatible storage.
 
 ## Архитектура
 
-Код организован по Clean Architecture:
+Проект организован по Clean Architecture:
 
-- `src/domain` — доменные сущности и бизнес-правила риска;
+- `src/domain` — доменные сущности и бизнес-правила;
 - `src/application` — use cases обучения, скоринга и мониторинга;
-- `src/infrastructure` — адаптеры БД, S3/MinIO и ML-интеграции;
-- `src/interfaces` — API, CLI и точка входа приложения;
+- `src/infrastructure` — интеграции с Postgres, S3/MinIO и ML-адаптеры;
+- `src/interfaces` — FastAPI, CLI и точки входа;
 - `tests` — unit-тесты.
 
 Ключевые доменные сущности:
@@ -23,92 +22,148 @@
 - `Booking` — предметное представление одного бронирования;
 - `BookingRiskScore` — результат оценки риска отмены для одного бронирования;
 - `BatchScoringResult` — результат batch scoring для группы бронирований;
-- `TrainingResult` — результат обучения модели с метриками, параметрами и отчётом.
+- `TrainingResult` — результат обучения модели с метриками и параметрами.
 
-## Что делает сервис
+## Внешние зависимости
 
-1. Обучает LightGBM-модель на исторических бронированиях.
-2. Представляет входные бронирования как доменные сущности и рассчитывает для них риск отмены.
-3. Сохраняет артефакты модели только в S3-compatible storage.
-4. Загружает модель из S3 при старте API.
-5. Пишет метрики обучения и batch scoring в Postgres.
+Для полной работы сервиса нужны:
 
-## Требования
+- `Postgres` — хранение prediction records и мониторинга;
+- `S3-compatible storage` — хранение артефактов модели;
+- локально можно использовать `MinIO` как S3-compatible storage.
 
-- Python 3.11+
-- Postgres
-- S3-compatible storage
-- Для локальной разработки можно использовать MinIO через `docker-compose.minio.yml`
+Важно: модель загружается из S3 при старте API, поэтому S3 должен быть доступен до запуска `uvicorn`.
 
-## Локальный запуск
+## Быстрый локальный запуск
 
-1. Скопировать `.env.example` в `.env`.
-2. Заполнить `POSTGRES_*` и `S3_*` переменные.
-3. При локальной разработке поднять MinIO:
+### 1. Подготовить `.env`
+
+Скопируйте `.env.example` в `.env` и заполните локальные секреты.
+
+Базовые локальные значения:
+
+- `POSTGRES_HOST=localhost`
+- `POSTGRES_PORT=5432`
+- `POSTGRES_DB=booking_cancellation`
+- `POSTGRES_USER=booking_user`
+- `POSTGRES_SSLMODE=disable`
+- `S3_ENDPOINT_URL=http://localhost:9000`
+- `S3_BUCKET=booking-cancellation-artifacts`
+- `S3_REGION=us-east-1`
+- `S3_ARTIFACTS_PREFIX=artifacts`
+- `S3_AUTO_CREATE_BUCKET=true`
+- `S3_USE_PATH_STYLE=true`
+
+Локально нужно задать в `.env`:
+
+- `POSTGRES_PASSWORD`
+- `S3_ACCESS_KEY`
+- `S3_SECRET_KEY`
+- `MINIO_ROOT_USER`
+- `MINIO_ROOT_PASSWORD`
+
+Обычно удобно использовать одинаковые пары:
+
+- `MINIO_ROOT_USER = S3_ACCESS_KEY`
+- `MINIO_ROOT_PASSWORD = S3_SECRET_KEY`
+
+### 2. Установить зависимости
 
 ```powershell
-docker compose -f docker-compose.minio.yml up -d
-```
-
-1. Установить зависимости:
-
-```powershell
+py -m venv venv
+.\venv\Scripts\Activate.ps1
 py -m pip install -r requirements.txt
 py -m pip install -r requirements-dev.txt
 ```
 
-1. Обучить модель и загрузить артефакты в S3:
+### 3. Запустить Docker Desktop
+
+Перед запуском локальной инфраструктуры Docker Desktop должен быть открыт, а Docker Engine — запущен.
+
+Проверка:
 
 ```powershell
+docker version
+```
+
+Команда должна показывать и `Client`, и `Server`.
+
+### 4. Поднять локальную инфраструктуру и загрузить модель
+
+Самый короткий сценарий:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1
+```
+
+Что делает скрипт:
+
+1. поднимает `Postgres` и `MinIO` через `docker-compose.local.yml`;
+2. инициализирует таблицы в Postgres;
+3. обучает модель;
+4. загружает артефакты модели в S3/MinIO.
+
+Если хотите сделать это вручную:
+
+```powershell
+docker compose -f docker-compose.local.yml up -d
+py -m src.interfaces.cli.init_db_cli
 py -m src.interfaces.cli.train_models_cli
 ```
 
-1. Запустить API:
+### 5. Запустить API
 
 ```powershell
 py -m uvicorn src.interfaces.main:app --reload
 ```
 
-1. Открыть Swagger UI:
+После запуска можно открыть:
 
-```text
-http://127.0.0.1:8000/docs
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- health check: `http://127.0.0.1:8000/health`
+- MinIO console: `http://127.0.0.1:9001`
+
+## Что считается успешным запуском
+
+Если всё поднялось правильно:
+
+- `http://127.0.0.1:8000/health` отвечает JSON вроде:
+
+```json
+{"status":"ok","model_loaded":true,"model_name":"LightGBM"}
 ```
 
-## MinIO / Local S3
+- в MinIO console есть бакет `booking-cancellation-artifacts`;
+- внутри бакета лежат:
+  - `artifacts/lightgbm_model.txt`
+  - `artifacts/lightgbm_model.pkl`
+  - `artifacts/model_comparison.json`
 
-Проект использует S3 как единственный источник истины для артефактов модели.
-Локальный каталог `artifacts/` не хранится в git и не используется как fallback для загрузки модели.
+## Batch scoring
 
-Для локального MinIO:
+Базовая команда:
 
 ```powershell
-docker compose -f docker-compose.minio.yml up -d
+py -m src.interfaces.cli.predict_cli
 ```
 
-Заполнить в `.env`:
+Рекомендуемый режим для batch-сервиса:
 
-- `S3_ENDPOINT_URL=http://localhost:9000`
-- `S3_BUCKET=booking-cancellation-artifacts`
-- `S3_ACCESS_KEY=<your-local-minio-user>`
-- `S3_SECRET_KEY=<your-local-minio-password>`
-- `S3_REGION=us-east-1`
-- `S3_ARTIFACTS_PREFIX=artifacts`
-- `S3_AUTO_CREATE_BUCKET=true`
-- `S3_USE_PATH_STYLE=true`
-- `MINIO_ROOT_USER=<your-local-minio-user>`
-- `MINIO_ROOT_PASSWORD=<your-local-minio-password>`
+```powershell
+py -m src.interfaces.cli.predict_cli --run-date 2026-04-16
+```
 
-Как это работает:
+В этом случае результаты будут записаны в:
 
-- `train_models_cli` обучает модель и публикует `lightgbm_model.txt`, `lightgbm_model.pkl` и `model_comparison.json` напрямую в S3;
-- API на старте загружает модель и метаданные из S3;
-- batch scoring CLI использует модель из S3 и пишет мониторинговые записи в Postgres.
+- `artifacts/batch_runs/2026-04-16/booking_risk_scores.csv`
+- `artifacts/batch_runs/2026-04-16/high_risk_bookings.csv`
+
+Это удобно для детерминированного запуска batch-задач и дальнейшего внедрения идемпотентности и backfill.
 
 ## API
 
-- `GET /health` — healthcheck и статус загрузки модели.
-- `POST /predict` — предсказание вероятности отмены для одного бронирования.
+- `GET /health` — проверка доступности сервиса и факта загрузки модели;
+- `POST /predict` — предсказание вероятности отмены для одного бронирования;
 - `POST /predict/batch` — batch scoring для списка бронирований.
 
 ## Мониторинг
@@ -116,33 +171,40 @@ docker compose -f docker-compose.minio.yml up -d
 Сервис сохраняет в Postgres:
 
 - ML-метрики обучения: `accuracy`, `precision`, `recall`, `f1`, `roc_auc`;
-- технические и процессные метрики: число записей до и после предобработки, долю high-risk, среднюю вероятность отмены, число невалидных дат.
+- batch-метрики: число записей до и после предобработки, долю high-risk, среднюю вероятность отмены, число невалидных дат.
 
-## Тесты
+## Тесты и проверки
 
 ```powershell
-pytest
+ruff check .
+mypy src
+pytest --basetemp=.pytest_tmp -o cache_dir=.pytest_cache_local
 ```
 
-В проекте настроены:
+## Docker
 
-- unit-тесты;
-- `ruff`;
-- `mypy`;
-- GitHub Actions CI.
+`Dockerfile` нужен для контейнеризации приложения: он собирает воспроизводимый образ с Python, зависимостями и кодом сервиса.
+
+`docker-compose.local.yml` нужен для удобного локального старта инфраструктуры:
+
+- `Postgres`
+- `MinIO`
+
+Это подготовка к следующему этапу — batch-сервису на Airflow с `DockerOperator`.
 
 ## Deploy
 
 Для деплоя нужны:
 
-- отчуждённый Postgres;
-- S3-compatible storage для артефактов модели;
-- заполненные переменные окружения из `.env.example`.
+- отчуждённый `Postgres`;
+- `S3-compatible storage` для артефактов модели;
+- переменные окружения из `.env.example`;
+- предварительный запуск `py -m src.interfaces.cli.train_models_cli`, чтобы модель оказалась в S3.
 
-Базовый порядок деплоя:
+Базовый порядок:
 
-1. Поднять Postgres и S3 storage.
-2. Задать `POSTGRES_*` и `S3_*` переменные окружения.
-3. Один раз выполнить `py -m src.interfaces.cli.train_models_cli`, чтобы артефакты модели появились в S3.
-4. Запустить API командой `py -m uvicorn src.interfaces.main:app --host 0.0.0.0 --port 8000`.
-5. Проверить `GET /health` и `POST /predict`.
+1. поднять Postgres и S3;
+2. задать `POSTGRES_*` и `S3_*`;
+3. выполнить `py -m src.interfaces.cli.train_models_cli`;
+4. запустить API командой `py -m uvicorn src.interfaces.main:app --host 0.0.0.0 --port 8000`;
+5. проверить `GET /health`.

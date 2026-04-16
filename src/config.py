@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 
 
 def _env_flag(name: str, default: bool = False) -> bool:
+    # Parse boolean-like flags from .env values such as true/false or 1/0.
     value = os.getenv(name)
     if value is None:
         return default
@@ -99,8 +100,11 @@ class Settings:
 
 
 def build_settings() -> Settings:
+    # Resolve the project root once so every other path can be derived from it.
     base_dir = Path(__file__).resolve().parents[1]
     load_dotenv(base_dir / ".env")
+
+    # Centralized local directories used across training, inference, and docs.
     data_dir = base_dir / "data"
     raw_data_dir = data_dir / "raw"
     processed_data_dir = data_dir / "processed"
@@ -108,6 +112,7 @@ def build_settings() -> Settings:
     docs_dir = base_dir / "docs"
 
     return Settings(
+        # Project directories and file locations.
         base_dir=base_dir,
         data_dir=data_dir,
         raw_data_dir=raw_data_dir,
@@ -122,8 +127,10 @@ def build_settings() -> Settings:
         model_report_path=artifacts_dir / "model_comparison.json",
         risk_scores_path=artifacts_dir / "booking_risk_scores.csv",
         high_risk_bookings_path=artifacts_dir / "high_risk_bookings.csv",
+        # Default ML thresholds and train/test split parameters.
         default_high_risk_threshold=float(os.getenv("DEFAULT_HIGH_RISK_THRESHOLD", "0.7")),
         default_batch_risk_share=float(os.getenv("DEFAULT_BATCH_RISK_SHARE", "0.3")),
+        # Remote Postgres connection settings.
         postgres_host=os.getenv("POSTGRES_HOST"),
         postgres_port=(
             int(os.getenv("POSTGRES_PORT", "5432"))
@@ -134,6 +141,7 @@ def build_settings() -> Settings:
         postgres_user=os.getenv("POSTGRES_USER"),
         postgres_password=os.getenv("POSTGRES_PASSWORD"),
         postgres_sslmode=os.getenv("POSTGRES_SSLMODE", "require"),
+        # S3-compatible storage settings used for model artifacts.
         s3_endpoint_url=os.getenv("S3_ENDPOINT_URL"),
         s3_bucket=os.getenv("S3_BUCKET"),
         s3_access_key=os.getenv("S3_ACCESS_KEY"),
@@ -142,6 +150,7 @@ def build_settings() -> Settings:
         s3_artifacts_prefix=os.getenv("S3_ARTIFACTS_PREFIX", "artifacts").strip("/"),
         s3_auto_create_bucket=_env_flag("S3_AUTO_CREATE_BUCKET", default=True),
         s3_use_path_style=_env_flag("S3_USE_PATH_STYLE", default=True),
+        # Dataset-specific column names and reproducibility parameters.
         target_column="booking status",
         id_column="Booking_ID",
         date_column="date of reservation",
