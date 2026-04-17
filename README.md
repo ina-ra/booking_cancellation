@@ -167,14 +167,15 @@ py -m src.interfaces.cli.predict_cli --run-date 2026-04-16
 - `artifacts/batch_runs/2026-04-16/booking_risk_scores.csv`
 - `artifacts/batch_runs/2026-04-16/high_risk_bookings.csv`
 
-Это удобно для детерминированного запуска batch-задач и дальнейшего внедрения идемпотентности и backfill.
+Это удобно для детерминированного запуска batch-задач и дальнейшего backfill.
 
-Если run-date уже был успешно обработан, batch CLI увидит `_SUCCESS` marker в S3 и пропустит повторный запуск.
-Для принудительного пересчёта можно использовать:
+Повторный запуск на тот же `run-date` не скипается:
 
-```powershell
-py -m src.interfaces.cli.predict_cli --run-date 2026-04-16 --force
-```
+- batch scoring выполняется заново;
+- файлы в S3/MinIO для этой даты перезаписываются;
+- записи в Postgres для той же даты сначала заменяются, поэтому дубликаты не создаются.
+
+То есть идемпотентность здесь обеспечивается не пропуском rerun, а безопасным overwrite/update поведением.
 
 ## Airflow
 
@@ -193,7 +194,7 @@ py -m src.interfaces.cli.predict_cli --run-date 2026-04-16 --force
 
 Текущая структура DAG:
 
-1. `check_batch_not_processed` — проверяет, есть ли `_SUCCESS` marker для run-date;
+1. `check_batch_not_processed` — логирует, были ли для `run-date` уже записаны outputs, но rerun не блокирует;
 2. `run_batch_scoring` — запускает основной batch scoring в контейнере;
 3. `verify_batch_outputs` — проверяет, что результаты и `_SUCCESS` marker появились в S3.
 
@@ -232,7 +233,8 @@ docker compose -f docker-compose.local.yml exec airflow-standalone airflow dags 
 Идемпотентность обеспечивается двумя слоями:
 
 - output paths partitioned by `run_date`;
-- `_SUCCESS` marker в S3 не даёт повторно выполнить уже успешный batch-run без `--force`.
+- rerun на ту же дату перезаписывает те же файлы в S3;
+- перед записью в Postgres старые записи для того же `run_date` удаляются и заменяются новыми, поэтому дубликаты не появляются.
 
 ## API
 

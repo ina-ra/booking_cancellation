@@ -30,8 +30,11 @@ def main():
 
     if args.mode == "precheck":
         if batch_run_exists(args.run_date):
-            print(f"Batch run for {args.run_date} is already marked as successful.")
-            raise SystemExit(99)
+            print(
+                f"Batch run for {args.run_date} already has outputs in S3. "
+                "Rerun is allowed and will overwrite them without creating duplicates."
+            )
+            return
 
         print(f"Batch run for {args.run_date} has not been processed yet.")
         return

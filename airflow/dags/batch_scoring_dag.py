@@ -57,7 +57,6 @@ with DAG(
         network_mode="booking_cancellation_default",
         mount_tmp_dir=False,
         environment=build_batch_environment(),
-        skip_on_exit_code=99,
     )
 
     run_batch_scoring = DockerOperator(
