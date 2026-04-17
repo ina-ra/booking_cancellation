@@ -190,6 +190,7 @@ py -m src.interfaces.cli.predict_cli --run-date 2026-04-16
 - передаёт в контейнер логическую дату запуска как `{{ ds }}`;
 - запускает batch-контейнер в docker-сети `booking_cancellation_default`;
 - работает с `Postgres` и `MinIO` через контейнерные адреса `postgres` и `minio`;
+- получает секреты и параметры batch-run из `Airflow Variables`;
 - поддерживает catchup и backfill.
 
 Текущая структура DAG:
@@ -219,6 +220,41 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_airflow.ps1
 
 - Airflow UI: `http://127.0.0.1:8081`
 - логин: значения `AIRFLOW_ADMIN_USERNAME` / `AIRFLOW_ADMIN_PASSWORD` из `.env`
+
+### Variables в Airflow UI
+
+Для работы DAG секреты теперь задаются через `Airflow UI`:
+
+1. Откройте `Admin -> Variables`
+2. Создайте переменные:
+   - `POSTGRES_DB`
+   - `POSTGRES_USER`
+   - `POSTGRES_PASSWORD`
+   - `S3_BUCKET`
+   - `S3_ACCESS_KEY`
+   - `S3_SECRET_KEY`
+3. Рекомендуемые дополнительные переменные:
+   - `S3_REGION`
+   - `S3_ARTIFACTS_PREFIX`
+   - `S3_BATCH_OUTPUTS_PREFIX`
+   - `S3_AUTO_CREATE_BUCKET`
+   - `S3_USE_PATH_STYLE`
+   - `DEFAULT_BATCH_RISK_SHARE`
+
+Минимальные значения для локального запуска:
+
+- `POSTGRES_DB=booking_cancellation`
+- `POSTGRES_USER=postgres`
+- `POSTGRES_PASSWORD=<ваш пароль из .env>`
+- `S3_BUCKET=booking-cancellation-artifacts`
+- `S3_ACCESS_KEY=booking_minio`
+- `S3_SECRET_KEY=<ваш S3 пароль из .env>`
+- `S3_REGION=us-east-1`
+- `S3_ARTIFACTS_PREFIX=artifacts`
+- `S3_BATCH_OUTPUTS_PREFIX=batch-runs`
+- `S3_AUTO_CREATE_BUCKET=true`
+- `S3_USE_PATH_STYLE=true`
+- `DEFAULT_BATCH_RISK_SHARE=0.3`
 
 ### Backfill
 

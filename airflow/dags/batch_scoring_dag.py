@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import os
 from datetime import timedelta
 
 import pendulum
@@ -12,21 +11,21 @@ from airflow import DAG
 def build_batch_environment() -> dict[str, str]:
     return {
         "POSTGRES_HOST": "postgres",
-        "POSTGRES_PORT": os.getenv("POSTGRES_PORT", "5432"),
-        "POSTGRES_DB": os.environ["POSTGRES_DB"],
-        "POSTGRES_USER": os.environ["POSTGRES_USER"],
-        "POSTGRES_PASSWORD": os.environ["POSTGRES_PASSWORD"],
+        "POSTGRES_PORT": "5432",
+        "POSTGRES_DB": "{{ var.value.POSTGRES_DB }}",
+        "POSTGRES_USER": "{{ var.value.POSTGRES_USER }}",
+        "POSTGRES_PASSWORD": "{{ var.value.POSTGRES_PASSWORD }}",
         "POSTGRES_SSLMODE": "disable",
         "S3_ENDPOINT_URL": "http://minio:9000",
-        "S3_BUCKET": os.environ["S3_BUCKET"],
-        "S3_ACCESS_KEY": os.environ["S3_ACCESS_KEY"],
-        "S3_SECRET_KEY": os.environ["S3_SECRET_KEY"],
-        "S3_REGION": os.getenv("S3_REGION", "us-east-1"),
-        "S3_ARTIFACTS_PREFIX": os.getenv("S3_ARTIFACTS_PREFIX", "artifacts"),
-        "S3_BATCH_OUTPUTS_PREFIX": os.getenv("S3_BATCH_OUTPUTS_PREFIX", "batch-runs"),
-        "S3_AUTO_CREATE_BUCKET": os.getenv("S3_AUTO_CREATE_BUCKET", "true"),
-        "S3_USE_PATH_STYLE": os.getenv("S3_USE_PATH_STYLE", "true"),
-        "DEFAULT_BATCH_RISK_SHARE": os.getenv("DEFAULT_BATCH_RISK_SHARE", "0.3"),
+        "S3_BUCKET": "{{ var.value.S3_BUCKET }}",
+        "S3_ACCESS_KEY": "{{ var.value.S3_ACCESS_KEY }}",
+        "S3_SECRET_KEY": "{{ var.value.S3_SECRET_KEY }}",
+        "S3_REGION": "{{ var.value.get('S3_REGION', 'us-east-1') }}",
+        "S3_ARTIFACTS_PREFIX": "{{ var.value.get('S3_ARTIFACTS_PREFIX', 'artifacts') }}",
+        "S3_BATCH_OUTPUTS_PREFIX": "{{ var.value.get('S3_BATCH_OUTPUTS_PREFIX', 'batch-runs') }}",
+        "S3_AUTO_CREATE_BUCKET": "{{ var.value.get('S3_AUTO_CREATE_BUCKET', 'true') }}",
+        "S3_USE_PATH_STYLE": "{{ var.value.get('S3_USE_PATH_STYLE', 'true') }}",
+        "DEFAULT_BATCH_RISK_SHARE": "{{ var.value.get('DEFAULT_BATCH_RISK_SHARE', '0.3') }}",
     }
 
 
