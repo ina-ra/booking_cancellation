@@ -62,3 +62,4 @@ config/*.key
 .aws/
 credentials
 airflow/logs/
+docker-images/

@@ -104,12 +104,36 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1
 
 Что делает скрипт:
 
-1. собирает Docker-образ `booking-cancellation-app:latest` для `DockerOperator`;
+1. использует уже загруженный Docker-образ `booking-cancellation-app:latest` или подгружает его из `.\docker-images\booking-cancellation-app-latest.tar`;
 2. поднимает `Postgres` и `MinIO` через `docker-compose.local.yml`;
 3. инициализирует таблицы в Postgres;
 4. обучает модель;
 5. загружает артефакты модели в S3/MinIO.
 6. только после этого поднимает `Airflow`, чтобы DAG не стартовал раньше готовности БД и модели.
+
+Если tar-архив лежит в другом месте, укажите его явно:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1 -ImageTarPath .\docker-images\booking-cancellation-app-latest.tar
+```
+
+Если хотите разрешить fallback на локальную сборку только когда архива нет:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1 -AllowBuild
+```
+
+### 4.1. Один раз подготовить tar-архив образа
+
+На машине, где образ уже собран и Docker работает:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\export_app_image.ps1
+```
+
+По умолчанию архив будет создан здесь:
+
+- `.\docker-images\booking-cancellation-app-latest.tar`
 
 Если хотите сделать это вручную:
 
@@ -215,6 +239,8 @@ This avoids accidentally connecting host-side Python commands to some other loca
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_airflow.ps1
 ```
+
+Он тоже сначала попытается использовать локальный image tar, а к сборке перейдёт только с флагом `-AllowBuild`.
 
 После старта:
 
