@@ -28,6 +28,7 @@ __pycache__/
 .ruff_cache/
 pytest-cache-files-*/
 tmp*/
+.cache/
 
 # ML данные и модели
 # data/
@@ -63,3 +64,13 @@ config/*.key
 credentials
 airflow/logs/
 docker-images/
+
+# Node / frontend
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
