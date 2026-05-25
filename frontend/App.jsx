@@ -141,7 +141,7 @@ const inputStyle = {
   border: "1px solid #d7dde8",
   borderRadius: 12,
   padding: "10px 12px",
-  fontSize: 14,
+  fontSize: 15,
   background: "#fff",
   color: "#0f172a",
   outline: "none",
@@ -169,7 +169,7 @@ async function requestJson(path, options = {}) {
   const body = contentType.includes("application/json") ? await response.json() : null;
 
   if (!response.ok) {
-    const message = body?.detail || `Request failed with status ${response.status}`;
+    const message = body?.detail || `Запрос завершился с ошибкой: ${response.status}`;
     throw new Error(message);
   }
 
@@ -271,7 +271,7 @@ function parseCsvBookings(text) {
     .filter(Boolean);
 
   if (lines.length < 2) {
-    throw new Error("CSV file is empty or does not contain data rows.");
+    throw new Error("CSV-файл пустой или не содержит строк с данными.");
   }
 
   const headers = parseCsvLine(lines[0]);
@@ -279,7 +279,7 @@ function parseCsvBookings(text) {
 
   for (const header of requiredHeaders) {
     if (!headers.includes(header)) {
-      throw new Error(`CSV is missing required column: ${header}`);
+      throw new Error(`В CSV отсутствует обязательная колонка: ${header}`);
     }
   }
 
@@ -310,22 +310,33 @@ function parseCsvBookings(text) {
 
 function getRiskMeta(risk) {
   if (risk >= 60) {
-    return { color: "#dc2626", background: "#fef2f2", label: "High" };
+    return { color: "#dc2626", background: "#fef2f2", label: "Высокий" };
   }
 
   if (risk >= 35) {
-    return { color: "#d97706", background: "#fffbeb", label: "Medium" };
+    return { color: "#d97706", background: "#fffbeb", label: "Средний" };
   }
 
-  return { color: "#059669", background: "#ecfdf5", label: "Low" };
+  return { color: "#059669", background: "#ecfdf5", label: "Низкий" };
 }
 
 function Field({ label, hint, children }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-      <label style={{ fontSize: 14, fontWeight: 700, color: "#334155" }}>{label}</label>
+    <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+      <label
+        style={{
+          fontSize: 15,
+          fontWeight: 700,
+          color: "#334155",
+          lineHeight: 1.25,
+          minHeight: 28,
+          display: "block",
+        }}
+      >
+        {label}
+      </label>
       {children}
-      {hint ? <span style={{ fontSize: 12, color: "#64748b" }}>{hint}</span> : null}
+      {hint ? <span style={{ fontSize: 13, color: "#64748b" }}>{hint}</span> : null}
     </div>
   );
 }
@@ -358,9 +369,9 @@ function Section({ title, icon, description, children }) {
           {icon}
         </div>
         <div>
-          <h2 style={{ margin: 0, fontSize: 17 }}>{title}</h2>
+          <h2 style={{ margin: 0, fontSize: 18 }}>{title}</h2>
           {description ? (
-            <p style={{ margin: "5px 0 0", color: "#64748b", fontSize: 13, lineHeight: 1.45 }}>
+            <p style={{ margin: "5px 0 0", color: "#64748b", fontSize: 14, lineHeight: 1.5 }}>
               {description}
             </p>
           ) : null}
@@ -490,6 +501,7 @@ function SummaryCard({ label, value, hint }) {
       }}
     >
       <p style={{ margin: 0, color: "#64748b", fontSize: 13, fontWeight: 700 }}>{label}</p>
+      
       <p
         style={{
           margin: "8px 0 0",
@@ -501,7 +513,7 @@ function SummaryCard({ label, value, hint }) {
       >
         {value}
       </p>
-      {hint ? <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: 12 }}>{hint}</p> : null}
+      {hint ? <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: 13 }}>{hint}</p> : null}
     </div>
   );
 }
@@ -560,17 +572,16 @@ function SingleScoringPanel() {
 
   const risk = result?.risk ?? null;
   const riskMeta = risk === null ? null : getRiskMeta(risk);
-  const riskLabel =
-    risk === null ? "Not calculated" : `${riskMeta.label} cancellation risk`;
+  const riskLabel = risk === null ? "Не рассчитан" : `${riskMeta.label} риск отмены`;
   const riskColor = riskMeta?.color || "#64748b";
   const recommendation =
     risk === null
-      ? "Complete the booking details and run scoring to get a prediction."
+      ? "Заполните данные бронирования и запустите скоринг, чтобы получить прогноз."
       : risk >= 60
-        ? "Recommended action: confirm the booking in advance or apply additional risk handling."
+        ? "Рекомендуемое действие: заранее подтвердить бронирование или применить дополнительные меры контроля риска."
         : risk >= 35
-          ? "Recommended action: monitor this booking and consider a soft reminder before arrival."
-          : "Recommended action: keep standard booking processing.";
+          ? "Рекомендуемое действие: отслеживать это бронирование и при необходимости отправить мягкое напоминание перед заездом."
+          : "Рекомендуемое действие: оставить стандартную обработку бронирования.";
 
   return (
     <div
@@ -583,19 +594,19 @@ function SingleScoringPanel() {
     >
       <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
         <Section
-          title="Basic booking information"
-          icon="ID"
-          description="Identify the booking and reservation date."
+          title="Основная информация о бронировании"
+          icon="📋"
+          description="Укажите идентификатор бронирования и дату резервирования."
         >
           <SectionGrid>
-            <Field label="Booking ID" hint="Optional. Can be generated automatically if empty.">
+            <Field label="ID бронирования" hint="Необязательно. Если оставить пустым, можно сгенерировать автоматически.">
               <TextInput
                 value={form.bookingId}
                 placeholder="INN02501"
                 onChange={(value) => update("bookingId", value)}
               />
             </Field>
-            <Field label="Date of reservation">
+            <Field label="Дата бронирования">
               <TextInput
                 type="date"
                 value={form.reservationDate}
@@ -605,9 +616,9 @@ function SingleScoringPanel() {
           </SectionGrid>
         </Section>
 
-        <Section title="Guests" icon="G" description="Guest composition for this reservation.">
+        <Section title="Гости" icon="👥" description="Состав гостей для этого бронирования.">
           <SectionGrid>
-            <Field label="Number of adults">
+            <Field label="Количество взрослых">
               <TextInput
                 type="number"
                 min="0"
@@ -615,7 +626,7 @@ function SingleScoringPanel() {
                 onChange={(value) => update("adults", value)}
               />
             </Field>
-            <Field label="Number of children">
+            <Field label="Количество детей">
               <TextInput
                 type="number"
                 min="0"
@@ -626,9 +637,9 @@ function SingleScoringPanel() {
           </SectionGrid>
         </Section>
 
-        <Section title="Stay details" icon="R" description="Room, meal plan, stay duration and price.">
+        <Section title="Детали проживания" icon="🛏️" description="Тип номера, питание, длительность проживания и цена.">
           <SectionGrid>
-            <Field label="Weekend nights">
+            <Field label="Ночей в выходные">
               <TextInput
                 type="number"
                 min="0"
@@ -636,7 +647,7 @@ function SingleScoringPanel() {
                 onChange={(value) => update("weekendNights", value)}
               />
             </Field>
-            <Field label="Week nights">
+            <Field label="Ночей в будни">
               <TextInput
                 type="number"
                 min="0"
@@ -644,31 +655,34 @@ function SingleScoringPanel() {
                 onChange={(value) => update("weekNights", value)}
               />
             </Field>
-            <Field label="Room type">
+            <Field label="Тип номера">
               <SelectInput
                 value={form.roomType}
                 onChange={(value) => update("roomType", value)}
                 options={[
-                  "Room_Type 1",
-                  "Room_Type 2",
-                  "Room_Type 3",
-                  "Room_Type 4",
-                  "Room_Type 5",
-                  "Room_Type 6",
-                  "Room_Type 7",
-                ].map((value) => ({ value, label: value }))}
+                  { value: "Room_Type 1", label: "Номер типа 1" },
+                  { value: "Room_Type 2", label: "Номер типа 2" },
+                  { value: "Room_Type 3", label: "Номер типа 3" },
+                  { value: "Room_Type 4", label: "Номер типа 4" },
+                  { value: "Room_Type 5", label: "Номер типа 5" },
+                  { value: "Room_Type 6", label: "Номер типа 6" },
+                  { value: "Room_Type 7", label: "Номер типа 7" },
+                ]}
               />
             </Field>
-            <Field label="Meal type">
+            <Field label="Тип питания">
               <SelectInput
                 value={form.meal}
                 onChange={(value) => update("meal", value)}
-                options={["Meal Plan 1", "Meal Plan 2", "Meal Plan 3", "Not Selected"].map(
-                  (value) => ({ value, label: value })
-                )}
+                options={[
+                  { value: "Meal Plan 1", label: "План питания 1" },
+                  { value: "Meal Plan 2", label: "План питания 2" },
+                  { value: "Meal Plan 3", label: "План питания 3" },
+                  { value: "Not Selected", label: "Не выбрано" },
+                ]}
               />
             </Field>
-            <Field label="Average price">
+            <Field label="Средняя цена">
               <TextInput
                 type="number"
                 min="0"
@@ -680,32 +694,32 @@ function SingleScoringPanel() {
         </Section>
 
         <Section
-          title="Customer history and preferences"
-          icon="H"
-          description="Previous behavior and additional booking preferences."
+          title="История клиента и предпочтения"
+          icon="🧾"
+          description="Предыдущее поведение клиента и дополнительные параметры бронирования."
         >
           <SectionGrid>
-            <Field label="Repeated guest">
+            <Field label="Повторный гость">
               <SelectInput
                 value={form.repeated}
                 onChange={(value) => update("repeated", value)}
                 options={[
-                  { value: "0", label: "No" },
-                  { value: "1", label: "Yes" },
+                  { value: "0", label: "Нет" },
+                  { value: "1", label: "Да" },
                 ]}
               />
             </Field>
-            <Field label="Car parking space">
+            <Field label="Парковочное место">
               <SelectInput
                 value={form.parking}
                 onChange={(value) => update("parking", value)}
                 options={[
-                  { value: "0", label: "No" },
-                  { value: "1", label: "Yes" },
+                  { value: "0", label: "Нет" },
+                  { value: "1", label: "Да" },
                 ]}
               />
             </Field>
-            <Field label="Previous cancellations, P-C">
+            <Field label="Отмены ранее (P-C)">
               <TextInput
                 type="number"
                 min="0"
@@ -713,7 +727,7 @@ function SingleScoringPanel() {
                 onChange={(value) => update("previousCanceled", value)}
               />
             </Field>
-            <Field label="Previous not cancelled, P-not-C">
+            <Field label="Неотменённые ранее (P-not-C)">
               <TextInput
                 type="number"
                 min="0"
@@ -721,7 +735,7 @@ function SingleScoringPanel() {
                 onChange={(value) => update("previousNotCanceled", value)}
               />
             </Field>
-            <Field label="Special requests">
+            <Field label="Особые запросы">
               <TextInput
                 type="number"
                 min="0"
@@ -733,12 +747,12 @@ function SingleScoringPanel() {
         </Section>
 
         <Section
-          title="Booking channel and timing"
-          icon="T"
-          description="Lead time and market segment influence cancellation behavior."
+          title="Канал бронирования и сроки"
+          icon="📅"
+          description="Срок до заезда и рыночный сегмент влияют на вероятность отмены."
         >
           <SectionGrid>
-            <Field label="Lead time" hint="Number of days between reservation and arrival.">
+            <Field label="Срок до заезда" hint="Количество дней между бронированием и заездом.">
               <TextInput
                 type="number"
                 min="0"
@@ -746,13 +760,17 @@ function SingleScoringPanel() {
                 onChange={(value) => update("leadTime", value)}
               />
             </Field>
-            <Field label="Market segment">
+            <Field label="Рыночный сегмент">
               <SelectInput
                 value={form.marketSegment}
                 onChange={(value) => update("marketSegment", value)}
-                options={["Online", "Offline", "Corporate", "Complementary", "Aviation"].map(
-                  (value) => ({ value, label: value })
-                )}
+                options={[
+                  { value: "Online", label: "Онлайн" },
+                  { value: "Offline", label: "Офлайн" },
+                  { value: "Corporate", label: "Корпоративный" },
+                  { value: "Complementary", label: "Комплиментарный" },
+                  { value: "Aviation", label: "Авиация" },
+                ]}
               />
             </Field>
           </SectionGrid>
@@ -785,19 +803,19 @@ function SingleScoringPanel() {
             AI
           </div>
           <div>
-            <h2 style={{ margin: 0, fontSize: 18 }}>Scoring result</h2>
-            <p style={{ margin: "3px 0 0", fontSize: 12, color: "#64748b" }}>
-              One booking prediction
+            <h2 style={{ margin: 0, fontSize: 20 }}>Результат скоринга</h2>
+            <p style={{ margin: "3px 0 0", fontSize: 13, color: "#64748b" }}>
+              Прогноз для одного бронирования
             </p>
           </div>
         </div>
 
         <div style={{ borderRadius: 22, background: "#f8fafc", padding: 22, textAlign: "center" }}>
-          <p style={{ margin: 0, color: "#64748b", fontSize: 14 }}>Cancellation probability</p>
+          <p style={{ margin: 0, color: "#64748b", fontSize: 15 }}>Вероятность отмены</p>
           <p style={{ margin: "8px 0", fontSize: 54, fontWeight: 800, letterSpacing: -1.5 }}>
             {risk === null ? "—" : `${risk}%`}
           </p>
-          <p style={{ margin: 0, color: riskColor, fontSize: 14, fontWeight: 800 }}>
+          <p style={{ margin: 0, color: riskColor, fontSize: 15, fontWeight: 800 }}>
             {riskLabel}
           </p>
         </div>
@@ -828,11 +846,11 @@ function SingleScoringPanel() {
             borderRadius: 18,
             padding: 16,
             color: "#475569",
-            fontSize: 14,
+            fontSize: 15,
             lineHeight: 1.5,
           }}
         >
-          <strong style={{ color: riskColor }}>{risk !== null && risk >= 60 ? "High: " : "Info: "}</strong>
+          <strong style={{ color: riskColor }}>{risk !== null && risk >= 60 ? "Высокий риск: " : "Инфо: "}</strong>
           {recommendation}
         </div>
 
@@ -844,7 +862,7 @@ function SingleScoringPanel() {
               borderRadius: 16,
               background: "#fef2f2",
               color: "#b91c1c",
-              fontSize: 13,
+              fontSize: 14,
               border: "1px solid #fecaca",
             }}
           >
@@ -868,7 +886,7 @@ function SingleScoringPanel() {
               setError("");
             }}
           >
-            Fill example
+            Заполнить примером
           </button>
           <button
             type="button"
@@ -879,7 +897,7 @@ function SingleScoringPanel() {
               setError("");
             }}
           >
-            Clear
+            Очистить
           </button>
           <button
             type="button"
@@ -887,7 +905,7 @@ function SingleScoringPanel() {
             onClick={calculateRisk}
             disabled={isSubmitting}
           >
-            {isSubmitting ? "Calculating..." : "Calculate risk"}
+            {isSubmitting ? "Расчёт..." : "Рассчитать риск"}
           </button>
         </div>
       </aside>
@@ -970,21 +988,14 @@ function BatchScoringPanel() {
     downloadTextFile("batch_scoring_report.csv", header + body);
   };
 
-  const downloadExampleCsv = () => {
-    const body = batchExampleBookings
-      .map((booking) => bookingToCsvRow(booking).join(","))
-      .join("\n");
-    downloadTextFile("hotel_bookings_example.csv", `${csvColumns.join(",")}\n${body}`);
-  };
-
   const reportReady = hasRun && rows.length > 0;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
       <Section
-        title="Upload booking CSV"
-        icon="CSV"
-        description="Upload a dataset with the same schema used by the model."
+        title="Загрузка CSV с бронированиями"
+        icon="📁"
+        description="Загрузите датасет с той же схемой, которую использует модель."
       >
         <div
           style={{
@@ -1036,22 +1047,21 @@ function BatchScoringPanel() {
                 }
               }}
             />
-            <strong style={{ fontSize: 18 }}>Drop CSV file here or click to upload</strong>
+            <strong style={{ fontSize: 18 }}>Перетащите CSV сюда или нажмите для загрузки</strong>
             <span style={{ color: "#64748b", fontSize: 14 }}>
-              Expected columns: booking details, guest details, stay parameters and customer
-              history.
+              Ожидаемые колонки: детали бронирования, данные о гостях, параметры проживания и история клиента.
             </span>
             <span
               style={{
-                color: fileName ? "#0f172a" : "#94a3b8",
+                color: fileName ? "#64748b" : "#94a3b8",
                 fontSize: 14,
                 fontWeight: 700,
               }}
             >
-              {fileName || "No file selected"}
+              {fileName || "Файл не выбран"}
             </span>
             <span style={{ color: "#64748b", fontSize: 13 }}>
-              Loaded rows: {bookings.length}
+              Загружено строк: {bookings.length}
             </span>
           </label>
 
@@ -1061,7 +1071,7 @@ function BatchScoringPanel() {
               style={{ ...buttonStyle, background: "#0f172a", color: "#fff" }}
               onClick={loadExample}
             >
-              Load example CSV
+              Загрузить пример данных
             </button>
             <button
               type="button"
@@ -1073,63 +1083,46 @@ function BatchScoringPanel() {
               }}
               onClick={downloadTemplate}
             >
-              Download template
-            </button>
-            <button
-              type="button"
-              style={{
-                ...buttonStyle,
-                background: "#fff",
-                color: "#0f172a",
-                border: "1px solid #cbd5e1",
-              }}
-              onClick={downloadExampleCsv}
-            >
-              Download example
+              Скачать пустой шаблон
             </button>
             <p style={{ margin: 0, color: "#64748b", fontSize: 13, lineHeight: 1.45 }}>
-              Upload your own file or start with the example dataset to preview the workflow.
+              Загрузите свой файл или пример данных, чтобы быстро посмотреть сценарий работы.
             </p>
           </div>
         </div>
       </Section>
 
       <Section
-        title="Run batch scoring"
-        icon="RUN"
-        description="Calculate cancellation probability for every uploaded row."
+        title="Запуск батч-скоринга"
+        icon="⚙️"
+        description="Рассчитайте вероятность отмены для каждой загруженной строки."
       >
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 18,
+            justifyContent: "flex-end",
+            alignItems: "flex-start",
+            gap: 12,
             flexWrap: "wrap",
+            marginTop: -52,
           }}
         >
-          <div>
-            <h3 style={{ margin: 0, fontSize: 18 }}>Process uploaded bookings</h3>
-            <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: 14 }}>
-              Run predictions and review the highest-risk bookings first.
-            </p>
-          </div>
           <button
             type="button"
             style={{
               ...buttonStyle,
               background: bookings.length > 0 ? "#0f172a" : "#334155",
               color: "#fff",
-              minWidth: 220,
+              width: 260,
             }}
             onClick={runBatchScoring}
             disabled={isSubmitting}
           >
             {isSubmitting
-              ? "Running..."
+              ? "Запуск..."
               : bookings.length > 0
-                ? "Run batch scoring"
-                : "Run with example data"}
+                ? "Запустить батч-скоринг"
+                : "Запустить на примере"}
           </button>
         </div>
 
@@ -1150,7 +1143,7 @@ function BatchScoringPanel() {
         ) : null}
       </Section>
 
-      <Section title="Batch summary" icon="SUM" description="Main output metrics from the scoring run.">
+      <Section title="Сводка по батч-скорингу" icon="📊" description="Основные метрики по результатам запуска скоринга.">
         <div
           style={{
             display: "grid",
@@ -1158,28 +1151,28 @@ function BatchScoringPanel() {
             gap: 14,
           }}
         >
-          <SummaryCard label="Total predictions" value={hasRun ? summary.total : "—"} hint="Rows processed from CSV" />
-          <SummaryCard label="High-risk count" value={hasRun ? summary.highRiskCount : "—"} hint="Bookings with risk >= 60%" />
+          <SummaryCard label="Всего предсказаний" value={hasRun ? summary.total : "—"} hint="Строк обработано из CSV" />
+          <SummaryCard label="Высокий риск" value={hasRun ? summary.highRiskCount : "—"} hint="Бронирования с риском >= 60%" />
           <SummaryCard
-            label="Average probability"
+            label="Средняя вероятность"
             value={hasRun ? `${summary.averageProbability}%` : "—"}
-            hint="Mean cancellation probability"
+            hint="Средняя вероятность отмены"
           />
         </div>
       </Section>
 
-      <Section title="Top risky bookings" icon="TOP" description="Bookings that should be checked first.">
+      <Section title="Бронирования с наибольшим риском" icon="🚩" description="Бронирования, которые стоит проверить в первую очередь.">
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
             <thead>
               <tr style={{ textAlign: "left", color: "#64748b", borderBottom: "1px solid #e2e8f0" }}>
-                <th style={{ padding: "12px 10px" }}>Booking ID</th>
-                <th style={{ padding: "12px 10px" }}>Reservation date</th>
-                <th style={{ padding: "12px 10px" }}>Market segment</th>
-                <th style={{ padding: "12px 10px" }}>Room type</th>
-                <th style={{ padding: "12px 10px" }}>Lead time</th>
-                <th style={{ padding: "12px 10px" }}>Avg. price</th>
-                <th style={{ padding: "12px 10px" }}>Risk</th>
+                <th style={{ padding: "12px 10px" }}>ID бронирования</th>
+                <th style={{ padding: "12px 10px" }}>Дата бронирования</th>
+                <th style={{ padding: "12px 10px" }}>Сегмент</th>
+                <th style={{ padding: "12px 10px" }}>Тип номера</th>
+                <th style={{ padding: "12px 10px" }}>Срок до заезда</th>
+                <th style={{ padding: "12px 10px" }}>Средняя цена</th>
+                <th style={{ padding: "12px 10px" }}>Риск</th>
               </tr>
             </thead>
             <tbody>
@@ -1190,7 +1183,7 @@ function BatchScoringPanel() {
                     <td style={{ padding: "14px 10px", color: "#475569" }}>{row.reservationDate}</td>
                     <td style={{ padding: "14px 10px", color: "#475569" }}>{row.marketSegment}</td>
                     <td style={{ padding: "14px 10px", color: "#475569" }}>{row.roomType}</td>
-                    <td style={{ padding: "14px 10px", color: "#475569" }}>{row.leadTime} days</td>
+                    <td style={{ padding: "14px 10px", color: "#475569" }}>{row.leadTime} дн.</td>
                     <td style={{ padding: "14px 10px", color: "#475569" }}>{row.averagePrice}</td>
                     <td style={{ padding: "14px 10px" }}>
                       <RiskBadge risk={row.risk} />
@@ -1200,7 +1193,7 @@ function BatchScoringPanel() {
               ) : (
                 <tr>
                   <td colSpan="7" style={{ padding: 24, textAlign: "center", color: "#94a3b8" }}>
-                    Run batch scoring to see the riskiest bookings.
+                    Запустите батч-скоринг, чтобы увидеть самые рискованные бронирования.
                   </td>
                 </tr>
               )}
@@ -1210,25 +1203,20 @@ function BatchScoringPanel() {
       </Section>
 
       <Section
-        title="Download report"
-        icon="OUT"
-        description="Export results for further analysis or business review."
+        title="Экспорт результатов предсказания"
+        icon="⬇️"
+        description="Отчёт включает ID бронирований, вероятности и группы риска."
       >
         <div
           style={{
             display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
+            justifyContent: "flex-end",
+            alignItems: "flex-start",
             gap: 18,
             flexWrap: "wrap",
+            marginTop: -52,
           }}
         >
-          <div>
-            <h3 style={{ margin: 0, fontSize: 18 }}>Export prediction results</h3>
-            <p style={{ margin: "6px 0 0", color: "#64748b", fontSize: 14 }}>
-              Report includes booking IDs, probabilities and risk groups.
-            </p>
-          </div>
           <button
             type="button"
             disabled={!reportReady}
@@ -1236,12 +1224,12 @@ function BatchScoringPanel() {
               ...buttonStyle,
               background: reportReady ? "#0f172a" : "#e2e8f0",
               color: reportReady ? "#fff" : "#94a3b8",
-              minWidth: 220,
+              width: 260,
               cursor: reportReady ? "pointer" : "not-allowed",
             }}
             onClick={downloadReport}
           >
-            Download report
+            Скачать отчёт
           </button>
         </div>
       </Section>
@@ -1252,29 +1240,29 @@ function BatchScoringPanel() {
 function HomePage({ onNavigateToPredict, health }) {
   const features = [
     {
-      title: "Single scoring",
+      title: "Одиночный скоринг",
       description:
-        "Estimate cancellation probability for one booking using a structured manual form.",
-      icon: "ONE",
+        "Оценка вероятности отмены для одного бронирования с помощью структурированной формы.",
+      icon: "🎯",
     },
     {
-      title: "Batch scoring",
-      description: "Upload CSV files and process multiple hotel reservations in one run.",
-      icon: "CSV",
+      title: "Батч-скоринг",
+      description: "Загрузите CSV и обработайте несколько гостиничных бронирований за один запуск.",
+      icon: "📁",
     },
     {
-      title: "Risk prioritization",
-      description: "Review high-risk bookings first and support operational decisions.",
-      icon: "RISK",
+      title: "Приоритизация риска",
+      description: "Сначала просматривайте бронирования с высоким риском и быстрее принимайте операционные решения.",
+      icon: "📊",
     },
   ];
 
   const statusTone = health.error ? "error" : health.modelLoaded ? "success" : "warning";
   const statusLabel = health.error
-    ? "Backend unavailable"
+    ? "Бэкенд недоступен"
     : health.modelLoaded
-      ? "Service available"
-      : "Model not loaded yet";
+      ? "Сервис доступен"
+      : "Модель ещё не загружена";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
@@ -1303,11 +1291,10 @@ function HomePage({ onNavigateToPredict, health }) {
         <div style={{ position: "relative", zIndex: 1, maxWidth: 760 }}>
           <StatusPill tone={statusTone}>{statusLabel}</StatusPill>
           <h1 style={{ margin: "18px 0 0", fontSize: 52, lineHeight: 1, letterSpacing: -2 }}>
-            Hotel booking cancellation prediction
+            Прогнозирование отмены гостиничных бронирований
           </h1>
           <p style={{ margin: "18px 0 0", color: "#cbd5e1", fontSize: 17, lineHeight: 1.7 }}>
-            ML-based service for predicting hotel booking cancellations. Use it to identify risky
-            reservations, prioritize follow-up actions and reduce potential revenue loss.
+            Сервис на базе ML для прогнозирования отмены гостиничных бронирований. Используйте его, чтобы выявлять рискованные брони, расставлять приоритеты в работе и снижать потенциальные потери выручки.
           </p>
 
           <div style={{ display: "flex", gap: 12, marginTop: 28, flexWrap: "wrap" }}>
@@ -1322,7 +1309,7 @@ function HomePage({ onNavigateToPredict, health }) {
                 fontSize: 15,
               }}
             >
-              Go to Predict
+              Перейти к прогнозу
             </button>
           </div>
         </div>
@@ -1355,7 +1342,7 @@ function HomePage({ onNavigateToPredict, health }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                fontSize: 13,
+                fontSize: 24,
                 fontWeight: 800,
                 marginBottom: 18,
               }}
@@ -1390,10 +1377,10 @@ function HomePage({ onNavigateToPredict, health }) {
         >
           <div>
             <p style={{ margin: 0, color: "#64748b", fontWeight: 700, fontSize: 14 }}>
-              System status
+              Статус системы
             </p>
             <h2 style={{ margin: "8px 0 0", fontSize: 30 }}>
-              {health.error ? "Backend connection issue" : "Ready for inference"}
+              {health.error ? "Проблема с подключением к бэкенду" : "Готово к предсказаниям"}
             </h2>
             <p
               style={{
@@ -1406,7 +1393,7 @@ function HomePage({ onNavigateToPredict, health }) {
             >
               {health.error
                 ? health.error
-                : `The service is available, model status is ${health.modelLoaded ? "loaded" : "pending"}, and the prediction API is reachable.`}
+                : `Сервис доступен, статус модели: ${health.modelLoaded ? "загружена" : "ожидается"}, API предсказаний доступен.`}
             </p>
           </div>
 
@@ -1422,9 +1409,9 @@ function HomePage({ onNavigateToPredict, health }) {
                 padding: "14px 16px",
               }}
             >
-              <span style={{ fontWeight: 700 }}>Service</span>
+              <span style={{ fontWeight: 700 }}>Сервис</span>
               <span style={{ color: health.error ? "#dc2626" : "#059669", fontWeight: 800 }}>
-                {health.error ? "Unavailable" : "Available"}
+                {health.error ? "Недоступен" : "Доступен"}
               </span>
             </div>
             <div
@@ -1438,9 +1425,9 @@ function HomePage({ onNavigateToPredict, health }) {
                 padding: "14px 16px",
               }}
             >
-              <span style={{ fontWeight: 700 }}>Model</span>
+              <span style={{ fontWeight: 700 }}>Модель</span>
               <span style={{ color: health.modelLoaded ? "#059669" : "#d97706", fontWeight: 800 }}>
-                {health.modelLoaded ? health.modelName || "Loaded" : "Not loaded"}
+                {health.modelLoaded ? health.modelName || "Загружена" : "Не загружена"}
               </span>
             </div>
           </div>
@@ -1468,26 +1455,26 @@ function PredictPage() {
         }}
       >
         <div>
-          <h1 style={{ margin: 0, fontSize: 34, letterSpacing: -0.8 }}>Predict</h1>
+          <h1 style={{ margin: 0, fontSize: 36, letterSpacing: -0.8 }}>Прогноз</h1>
           <p
             style={{
               margin: "10px 0 0",
               maxWidth: 720,
-              fontSize: 15,
-              lineHeight: 1.5,
+              fontSize: 16,
+              lineHeight: 1.6,
               color: "#64748b",
             }}
           >
-            Choose manual input for one booking or upload a CSV file for multiple predictions.
+            Выберите ручной ввод для одного бронирования или загрузите CSV для массового расчёта.
           </p>
         </div>
 
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <TabButton active={activeTab === "single"} onClick={() => setActiveTab("single")}>
-            Single scoring
+            Одиночный скоринг
           </TabButton>
           <TabButton active={activeTab === "batch"} onClick={() => setActiveTab("batch")}>
-            Batch scoring
+            Батч-скоринг
           </TabButton>
         </div>
       </header>
@@ -1579,16 +1566,16 @@ export default function App() {
           <div style={{ display: "flex", alignItems: "center", gap: 20, flexWrap: "wrap" }}>
             <div style={{ display: "flex", gap: 8 }}>
               <TabButton active={page === "home"} onClick={() => setPage("home")}>
-                Home
+                Главная
               </TabButton>
               <TabButton active={page === "predict"} onClick={() => setPage("predict")}>
-                Predict
+                Прогноз
               </TabButton>
             </div>
           </div>
 
           <StatusPill tone={health.error ? "error" : health.modelLoaded ? "success" : "warning"}>
-            {health.error ? "Backend unavailable" : health.modelLoaded ? "Service available" : "Model pending"}
+            {health.error ? "Бэкенд недоступен" : health.modelLoaded ? "Сервис доступен" : "Модель загружается"}
           </StatusPill>
         </nav>
 
