@@ -1,6 +1,8 @@
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import JSONResponse
 
 from src.application.scoring import predict_batch_use_case, predict_one_use_case
+from src.config import settings
 from src.infrastructure.ml.model_loader import model_registry
 from src.interfaces.api.schemas.frontend import (
     FrontendBatchBookingRequest,
@@ -9,16 +11,61 @@ from src.interfaces.api.schemas.frontend import (
     FrontendBookingRequest,
     FrontendHealthResponse,
     FrontendPredictionResponse,
+    FrontendReadinessResponse,
 )
 from src.interfaces.api.schemas.request import BatchBookingRequest, BookingRequest
 from src.interfaces.api.schemas.response import (
     BatchPredictionResponse,
     HealthResponse,
     PredictionResponse,
+    ReadinessResponse,
 )
 
 router = APIRouter()
 frontend_router = APIRouter(prefix="/frontend-api")
+
+
+def _collect_missing_dependencies() -> list[str]:
+    missing_dependencies: list[str] = []
+
+    if not model_registry.is_ready():
+        missing_dependencies.append("model")
+    if not settings.postgres_enabled:
+        missing_dependencies.append("postgres")
+    if not settings.s3_enabled:
+        missing_dependencies.append("s3")
+
+    return missing_dependencies
+
+
+def _build_readiness_response() -> ReadinessResponse:
+    missing_dependencies = _collect_missing_dependencies()
+    is_ready = not missing_dependencies
+
+    return ReadinessResponse(
+        status="ready" if is_ready else "not_ready",
+        ready=is_ready,
+        model_loaded=model_registry.is_ready(),
+        model_name=model_registry.model_name,
+        postgres_configured=settings.postgres_enabled,
+        s3_configured=settings.s3_enabled,
+        missing_dependencies=missing_dependencies,
+    )
+
+
+def _build_frontend_readiness_response() -> FrontendReadinessResponse:
+    missing_dependencies = _collect_missing_dependencies()
+    is_ready = not missing_dependencies
+
+    return FrontendReadinessResponse(
+        status="ready" if is_ready else "not_ready",
+        ready=is_ready,
+        modelLoaded=model_registry.is_ready(),
+        modelName=model_registry.model_name,
+        postgresConfigured=settings.postgres_enabled,
+        s3Configured=settings.s3_enabled,
+        missingDependencies=missing_dependencies,
+    )
 
 
 def _build_frontend_booking_payload(
@@ -78,6 +125,13 @@ def health_check():
     )
 
 
+@router.get("/ready", response_model=ReadinessResponse)
+def readiness_check():
+    payload = _build_readiness_response()
+    status_code = 200 if payload.ready else 503
+    return JSONResponse(status_code=status_code, content=payload.model_dump())
+
+
 @router.post("/predict", response_model=PredictionResponse)
 def predict(booking: BookingRequest):
     if not model_registry.is_ready():
@@ -107,6 +161,13 @@ def frontend_health_check():
         modelLoaded=model_registry.is_ready(),
         modelName=model_registry.model_name,
     )
+
+
+@frontend_router.get("/ready", response_model=FrontendReadinessResponse)
+def frontend_readiness_check():
+    payload = _build_frontend_readiness_response()
+    status_code = 200 if payload.ready else 503
+    return JSONResponse(status_code=status_code, content=payload.model_dump())
 
 
 @frontend_router.post("/predict", response_model=FrontendPredictionResponse)

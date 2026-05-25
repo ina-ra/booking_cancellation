@@ -1,0 +1,128 @@
+name: Deploy Staging
+
+on:
+  workflow_run:
+    workflows: ["Docker Publish"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Image tag to deploy, for example sha-abc1234 or latest"
+        required: false
+        default: "latest"
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: booking-cancellation-app
+
+jobs:
+  deploy:
+    if: >
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-latest
+    environment: staging
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve image tag
+        id: image
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ github.event.inputs.image_tag }}"
+          else
+            SHORT_SHA="$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)"
+            TAG="sha-${SHORT_SHA}"
+          fi
+          IMAGE="${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}:${TAG}"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare remote app directory
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script: |
+            mkdir -p "${{ secrets.STAGING_APP_DIR }}/airflow/logs"
+            mkdir -p "${{ secrets.STAGING_APP_DIR }}/airflow/dags"
+            mkdir -p "${{ secrets.STAGING_APP_DIR }}/deploy/staging"
+
+      - name: Upload compose and Airflow files
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          source: "docker-compose.staging.yml,airflow/dags"
+          target: ${{ secrets.STAGING_APP_DIR }}
+          strip_components: 0
+
+      - name: Render staging env on remote host
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script: |
+            cat > "${{ secrets.STAGING_APP_DIR }}/.env.staging" <<'EOF'
+            APP_IMAGE=${{ steps.image.outputs.image }}
+            POSTGRES_DB=${{ secrets.STAGING_POSTGRES_DB }}
+            POSTGRES_USER=${{ secrets.STAGING_POSTGRES_USER }}
+            POSTGRES_PASSWORD=${{ secrets.STAGING_POSTGRES_PASSWORD }}
+            POSTGRES_PORT=${{ secrets.STAGING_POSTGRES_PORT }}
+            POSTGRES_SSLMODE=${{ secrets.STAGING_POSTGRES_SSLMODE }}
+            DEFAULT_HIGH_RISK_THRESHOLD=${{ vars.STAGING_DEFAULT_HIGH_RISK_THRESHOLD || '0.7' }}
+            DEFAULT_BATCH_RISK_SHARE=${{ vars.STAGING_DEFAULT_BATCH_RISK_SHARE || '0.3' }}
+            RANDOM_STATE=${{ vars.STAGING_RANDOM_STATE || '42' }}
+            TEST_SIZE=${{ vars.STAGING_TEST_SIZE || '0.2' }}
+            S3_BUCKET=${{ secrets.STAGING_S3_BUCKET }}
+            S3_ACCESS_KEY=${{ secrets.STAGING_S3_ACCESS_KEY }}
+            S3_SECRET_KEY=${{ secrets.STAGING_S3_SECRET_KEY }}
+            S3_REGION=${{ secrets.STAGING_S3_REGION }}
+            S3_ARTIFACTS_PREFIX=${{ vars.STAGING_S3_ARTIFACTS_PREFIX || 'artifacts' }}
+            S3_BATCH_OUTPUTS_PREFIX=${{ vars.STAGING_S3_BATCH_OUTPUTS_PREFIX || 'batch-runs' }}
+            S3_AUTO_CREATE_BUCKET=${{ vars.STAGING_S3_AUTO_CREATE_BUCKET || 'true' }}
+            S3_USE_PATH_STYLE=${{ vars.STAGING_S3_USE_PATH_STYLE || 'true' }}
+            MINIO_ROOT_USER=${{ secrets.STAGING_MINIO_ROOT_USER }}
+            MINIO_ROOT_PASSWORD=${{ secrets.STAGING_MINIO_ROOT_PASSWORD }}
+            MINIO_API_PORT=${{ vars.STAGING_MINIO_API_PORT || '9000' }}
+            MINIO_CONSOLE_PORT=${{ vars.STAGING_MINIO_CONSOLE_PORT || '9001' }}
+            AIRFLOW_ADMIN_USERNAME=${{ secrets.STAGING_AIRFLOW_ADMIN_USERNAME }}
+            AIRFLOW_ADMIN_PASSWORD=${{ secrets.STAGING_AIRFLOW_ADMIN_PASSWORD }}
+            AIRFLOW_PORT=${{ vars.STAGING_AIRFLOW_PORT || '8081' }}
+            APP_PORT=${{ vars.STAGING_APP_PORT || '8000' }}
+            EOF
+
+      - name: Deploy on staging host
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script: |
+            cd "${{ secrets.STAGING_APP_DIR }}"
+            echo "${{ secrets.GHCR_READ_TOKEN }}" | docker login ghcr.io -u "${{ secrets.GHCR_READ_USER }}" --password-stdin
+            docker compose --env-file .env.staging -f docker-compose.staging.yml pull
+            docker compose --env-file .env.staging -f docker-compose.staging.yml up -d
+
+      - name: Smoke check staging readiness
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.STAGING_HOST }}
+          username: ${{ secrets.STAGING_SSH_USER }}
+          key: ${{ secrets.STAGING_SSH_KEY }}
+          port: ${{ secrets.STAGING_SSH_PORT || 22 }}
+          script: |
+            curl --fail "http://127.0.0.1:${{ vars.STAGING_APP_PORT || '8000' }}/ready"

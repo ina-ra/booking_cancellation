@@ -74,6 +74,16 @@ class FrontendHealthResponse(BaseModel):
     modelName: str
 
 
+class FrontendReadinessResponse(BaseModel):
+    status: str
+    ready: bool
+    modelLoaded: bool
+    modelName: str
+    postgresConfigured: bool
+    s3Configured: bool
+    missingDependencies: List[str]
+
+
 class FrontendPredictionResponse(BaseModel):
     bookingId: str
     reservationDate: str

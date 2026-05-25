@@ -23,6 +23,17 @@ def load_pickled_model() -> Any:
     return pickle.loads(payload)
 
 
+def training_artifacts_exist() -> bool:
+    ensure_s3_storage()
+    return all(
+        [
+            artifact_storage.object_exists(settings.lightgbm_model_text_object_name),
+            artifact_storage.object_exists(settings.lightgbm_model_pickle_object_name),
+            artifact_storage.object_exists(settings.model_report_object_name),
+        ]
+    )
+
+
 def upload_training_artifacts(model: Any, report: dict[str, Any]) -> None:
     ensure_s3_storage()
     artifact_storage.upload_text(

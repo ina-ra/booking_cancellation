@@ -9,6 +9,16 @@ class HealthResponse(BaseModel):
     model_name: str
 
 
+class ReadinessResponse(BaseModel):
+    status: str
+    ready: bool
+    model_loaded: bool
+    model_name: str
+    postgres_configured: bool
+    s3_configured: bool
+    missing_dependencies: List[str]
+
+
 class PredictionResponse(BaseModel):
     booking_id: Optional[str]
     probability_of_cancellation: float

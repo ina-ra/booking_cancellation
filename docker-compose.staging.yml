@@ -1,14 +1,14 @@
 services:
   postgres:
     image: postgres:16-alpine
-    container_name: booking-cancellation-postgres
+    container_name: booking-cancellation-staging-postgres
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
-      - "${POSTGRES_PORT:-5433}:5432"
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -19,27 +19,25 @@ services:
 
   minio:
     image: minio/minio:latest
-    container_name: booking-cancellation-minio
+    container_name: booking-cancellation-staging-minio
     restart: unless-stopped
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER}
       MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
 
   init-db:
-    image: booking-cancellation-app:latest
-    build:
-      context: .
+    image: ${APP_IMAGE}
     depends_on:
       postgres:
         condition: service_healthy
     env_file:
-      - ${APP_ENV_FILE:-.env}
+      - ${APP_ENV_FILE:-.env.staging}
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -53,9 +51,7 @@ services:
     restart: "no"
 
   seed-model:
-    image: booking-cancellation-app:latest
-    build:
-      context: .
+    image: ${APP_IMAGE}
     depends_on:
       postgres:
         condition: service_healthy
@@ -64,7 +60,7 @@ services:
       init-db:
         condition: service_completed_successfully
     env_file:
-      - ${APP_ENV_FILE:-.env}
+      - ${APP_ENV_FILE:-.env.staging}
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
@@ -78,10 +74,8 @@ services:
     restart: "no"
 
   app:
-    image: booking-cancellation-app:latest
-    build:
-      context: .
-    container_name: booking-cancellation-app
+    image: ${APP_IMAGE}
+    container_name: booking-cancellation-staging-app
     depends_on:
       postgres:
         condition: service_healthy
@@ -90,13 +84,13 @@ services:
       seed-model:
         condition: service_completed_successfully
     env_file:
-      - ${APP_ENV_FILE:-.env}
+      - ${APP_ENV_FILE:-.env.staging}
     environment:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       S3_ENDPOINT_URL: http://minio:9000
     ports:
-      - "8000:8000"
+      - "${APP_PORT:-8000}:8000"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/ready"]
@@ -106,7 +100,7 @@ services:
 
   airflow-standalone:
     image: apache/airflow:2.10.5-python3.11
-    container_name: booking-cancellation-airflow
+    container_name: booking-cancellation-staging-airflow
     restart: unless-stopped
     command:
       - bash
@@ -137,8 +131,8 @@ services:
       AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
       AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "true"
       _AIRFLOW_WWW_USER_CREATE: "true"
-      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME:?Set AIRFLOW_ADMIN_USERNAME in .env}
-      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?Set AIRFLOW_ADMIN_PASSWORD in .env}
+      _AIRFLOW_WWW_USER_USERNAME: ${AIRFLOW_ADMIN_USERNAME:?Set AIRFLOW_ADMIN_USERNAME in .env.staging}
+      _AIRFLOW_WWW_USER_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?Set AIRFLOW_ADMIN_PASSWORD in .env.staging}
       _PIP_ADDITIONAL_REQUIREMENTS: apache-airflow-providers-docker
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
@@ -157,7 +151,7 @@ services:
       - ./airflow/logs:/opt/airflow/logs
       - /var/run/docker.sock:/var/run/docker.sock
     ports:
-      - "8081:8080"
+      - "${AIRFLOW_PORT:-8081}:8080"
 
 volumes:
   postgres_data:
