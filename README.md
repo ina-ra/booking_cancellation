@@ -7,6 +7,13 @@
 - сохранение ML- и технических метрик в Postgres;
 - хранение модельных артефактов в S3-compatible storage.
 
+## Быстрый выбор сценария
+
+- Хотите просто запустить проект локально: `powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1`
+- Хотите локальный запуск без Airflow: `powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1 -SkipAirflow`
+- Хотите короткую production-like проверку: `powershell -ExecutionPolicy Bypass -File .\scripts\smoke_prod_stack.ps1`
+- Хотите подготовить staging: смотрите `docker-compose.staging.yml`, `.github/workflows/deploy-staging.yml` и [deploy/staging/SERVER_ONBOARDING.md](deploy/staging/SERVER_ONBOARDING.md)
+
 ## Архитектура
 
 Проект организован по Clean Architecture:
@@ -32,7 +39,7 @@
 - `S3-compatible storage` — хранение артефактов модели;
 - локально можно использовать `MinIO` как S3-compatible storage.
 
-Важно: модель загружается из S3 при старте API, поэтому S3 должен быть доступен до запуска `uvicorn`.
+Важно: модель загружается из S3 при старте API, поэтому S3 должен быть доступен до старта сервиса `app`.
 
 ## Запуск без ручной магии
 
@@ -75,21 +82,7 @@ Copy-Item .env.prod.example .env
 docker compose -f docker-compose.prod.yml up --build
 ```
 
-Эта команда теперь делает весь runtime-path автоматически:
-
-1. собирает production image `booking-cancellation-app:latest`;
-2. собирает React frontend в `frontend/dist` внутри Docker build;
-3. поднимает `Postgres` и `MinIO`;
-4. запускает one-off job `init-db`, который ждёт Postgres и накатывает схему;
-5. запускает one-off job `seed-model`, который:
-   - ждёт Postgres и S3,
-   - проверяет, есть ли артефакты модели в S3,
-   - если артефактов нет, обучает модель и публикует их;
-6. запускает `app`, который уже:
-   - грузит модель из S3,
-   - отдаёт API,
-   - отдаёт собранный frontend;
-7. только после этого поднимает `Airflow`, чтобы batch DAG не стартовал раньше готовности БД и модели.
+Эта команда собирает production image, поднимает `Postgres` и `MinIO`, выполняет `init-db` и `seed-model`, затем запускает `app`, а после этого `Airflow`.
 
 ### 3. Что открывать после старта
 
@@ -102,20 +95,9 @@ docker compose -f docker-compose.prod.yml up --build
 
 ### Как теперь работает фронтенд
 
-Frontend больше не требует отдельного `npm run dev` для production-like сценария.
+Для production-like сценария отдельный `npm run dev` больше не нужен: React/Vite собирается внутри Docker build, а итоговый frontend раздается тем же сервисом `app`, что и API.
 
-Во время Docker build:
-
-1. Node stage собирает React/Vite приложение;
-2. артефакты сборки попадают в финальный Python image;
-3. FastAPI отдает:
-   - API маршруты;
-   - собранный frontend;
-   - статику из `frontend/dist/assets`.
-
-То есть в итоге фронтенд и бэкенд работают с одного хоста и одного порта.
-
-### Как теперь устроены автоматические шаги
+### Автоматические шаги
 
 #### `init-db`
 
@@ -125,11 +107,7 @@ Frontend больше не требует отдельного `npm run dev` д�
 python -m src.interfaces.cli.runtime_prepare_cli --step init-db
 ```
 
-Что он делает:
-
-- ждёт доступности Postgres;
-- вызывает `ensure_database_schema()`;
-- завершает работу после успешной инициализации.
+Что делает: ждёт доступности Postgres, вызывает `ensure_database_schema()` и завершает работу после успешной инициализации.
 
 #### `seed-model`
 
@@ -139,13 +117,7 @@ python -m src.interfaces.cli.runtime_prepare_cli --step init-db
 python -m src.interfaces.cli.runtime_prepare_cli --step seed-model
 ```
 
-Что он делает:
-
-- ждёт доступности Postgres;
-- ждёт доступности S3/MinIO;
-- проверяет, есть ли model artifacts в S3;
-- если артефакты уже есть, ничего не переобучает;
-- если артефактов нет, запускает обучение и публикует модель.
+Что делает: ждёт Postgres и S3/MinIO, проверяет наличие model artifacts в S3 и переобучает модель только если артефактов ещё нет.
 
 Это и убирает главную ручную магию перед первым стартом.
 
@@ -178,22 +150,9 @@ powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1 -SkipAirflow
 ```
 
-Что теперь делает local compose:
+Local compose использует тот же граф сервисов, что и production-like запуск: `Postgres`, `MinIO`, `init-db`, `seed-model`, `app` и при полном сценарии `Airflow`.
 
-1. собирает production-like image приложения;
-2. собирает frontend;
-3. поднимает `Postgres` и `MinIO`;
-4. выполняет `init-db`;
-5. выполняет `seed-model`;
-6. запускает `app` на `http://127.0.0.1:8000`;
-7. при полном сценарии поднимает `Airflow`.
-
-То есть локально больше не нужно вручную:
-
-- запускать `uvicorn`;
-- запускать `npm run dev`;
-- вручную выполнять `init_db_cli`;
-- вручную обучать модель перед стартом API.
+То есть локально больше не нужно вручную запускать `uvicorn`, `npm run dev`, `init_db_cli` или обучение модели перед стартом API.
 
 ## CI/CD и registry flow
 
@@ -475,8 +434,8 @@ py -m src.interfaces.cli.predict_cli --run-date 2026-04-16
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_local.ps1
 ```
 
-Why `5433` instead of `5432`:
-This avoids accidentally connecting host-side Python commands to some other local Postgres already listening on `localhost:5432`. The app on your machine should talk to Docker Postgres through `localhost:5433`, while Airflow tasks inside Docker still use the internal Docker hostname `postgres:5432`.
+Почему `5433`, а не `5432`:
+Это защищает локальный запуск от конфликта с каким-нибудь другим Postgres на хост-машине. Хостовые подключения должны идти в Docker Postgres через `localhost:5433`, а контейнеры внутри compose-сети продолжают общаться с БД по адресу `postgres:5432`.
 
 Если нужен только Airflow без повторной инициализации БД и без обучения модели, можно использовать отдельный скрипт:
 
@@ -484,7 +443,7 @@ This avoids accidentally connecting host-side Python commands to some other loca
 powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_airflow.ps1
 ```
 
-Он тоже сначала попытается использовать локальный image tar, а к сборке перейдёт только с флагом `-AllowBuild`.
+Этот скрипт запускает тот же compose-flow для `Postgres`, `MinIO`, `init-db`, `seed-model` и `airflow-standalone`, но без старта основного `app`.
 
 После старта:
 
@@ -615,17 +574,30 @@ powershell -ExecutionPolicy Bypass -File .\scripts\cleanup_smoke.ps1
 
 ## Deploy
 
-Для деплоя нужны:
+Текущий production-friendly deploy опирается не на ручной запуск Python-команд, а на Docker image и orchestrated compose flow.
 
-- отчуждённый `Postgres`;
+Для deploy нужны:
+
+- Docker image приложения из registry, например `ghcr.io/<owner>/booking-cancellation-app:<tag>`;
+- `Postgres`;
 - `S3-compatible storage` для артефактов модели;
-- переменные окружения из `.env.example`;
-- предварительный запуск `py -m src.interfaces.cli.train_models_cli`, чтобы модель оказалась в S3.
+- env-конфигурация для среды (`.env.staging`, production secrets, GitHub Actions secrets/vars).
 
-Базовый порядок:
+Базовый runtime-path теперь такой:
 
-1. поднять Postgres и S3;
-2. задать `POSTGRES_*` и `S3_*`;
-3. выполнить `py -m src.interfaces.cli.train_models_cli`;
-4. запустить API командой `py -m uvicorn src.interfaces.main:app --host 0.0.0.0 --port 8000`;
+1. поднять `Postgres` и `S3/MinIO`;
+2. запустить `init-db`;
+3. запустить `seed-model`;
+4. запустить `app`;
 5. проверить `GET /ready`.
+
+Для staging это уже автоматизировано через:
+
+- `docker-compose.staging.yml`
+- `.github/workflows/deploy-staging.yml`
+
+Локально production-like сценарий можно проверить одной командой:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\smoke_prod_stack.ps1
+```
